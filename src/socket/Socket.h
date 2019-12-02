@@ -13,11 +13,13 @@ namespace libnetwork
 
 	public:
 		// ½¨Á¢Á¬½Ó
-		bool connect(const char* host, const char* port);
-	
+		bool connect(const char* host, const char* serv);
+
+		// ¼àÌı
+		bool listen(const char* host, const char* serv);	
 
 	private:
-		int _sockfd;		// socket ÃèÊö·û
+		int _sockfd;		// socket ÃèÊö·û  
 	};
 }	// namespace libnetwork
 
