@@ -7,6 +7,7 @@ namespace libnetwork
 	public:
 		// 构造函数
 		Socket();
+		Socket(int sockfd);
 
 		// 析构函数
 		~Socket();
@@ -17,6 +18,17 @@ namespace libnetwork
 
 		// 监听
 		bool listen(const char* host, const char* serv);	
+
+		// 接受连接
+		Socket accept();
+
+	public:
+		// socket 可用
+		bool isValide();
+
+		// 获取socket描述符
+		int getSockFD();
+
 
 	private:
 		int _sockfd;		// socket 描述符  

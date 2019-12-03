@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "Log.h"
+#include "SocketUtils.h"
 using namespace libnetwork;
 
 
@@ -14,11 +15,16 @@ Socket::Socket()
 
 }
 
-Socket::~Socket()
+Socket::Socket(int sockfd)
+	: _sockfd(sockfd)
 {
 
 }
 
+Socket::~Socket()
+{
+}
+ 
 bool Socket::connect(const char* host, const char* serv)
 {
 	struct addrinfo hints;
@@ -115,9 +121,31 @@ bool Socket::listen(const char* host, const char* serv)
 		return false;
 	}
 
+
 	_sockfd = listenfd;
 
-	Log::info("listen success for %s:%s fd:%d", host, serv, listenfd);
+	Log::info("listen success for %s:%s fd:%d, addr:%s", host, serv, listenfd, SocketUtils::getSockLocalAddrInfo(listenfd));
 
 	return true;
+}
+
+Socket Socket::accept()
+{	
+	int connfd = 0;
+	if ((connfd = ::accept(_sockfd, nullptr, nullptr)) > 0)
+	{
+		Log::info("accept success for connfd:%d client:%s", connfd, SocketUtils::getSocketPeerAddrInfo(connfd));
+		return Socket(connfd);
+	}
+	return Socket();
+}
+
+bool Socket::isValide()
+{
+	_sockfd > 0;
+}
+
+int Socket::getSockFD()
+{
+	return _sockfd;
 }
