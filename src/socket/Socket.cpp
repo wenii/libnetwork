@@ -2,8 +2,10 @@
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include "Log.h"
 #include "SocketUtils.h"
+
 using namespace libnetwork;
 
 
@@ -149,3 +151,87 @@ int Socket::getSockFD()
 {
 	return _sockfd;
 }
+
+bool Socket::recv(char* buf, int* size, int flag)
+{
+	const int bufSize = *size;
+	int recvSize = 0;
+	do {
+		ssize_t n = ::recv(_sockfd, buf + recvSize, bufSize - recvSize, flag);
+		if (n > 0)
+		{
+			recvSize += n;
+		}
+		else if (n == -1)
+		{
+			if (errno == EINTR)
+			{
+				continue;		// 中断，重试
+			}
+			else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			{
+				break;			// 没有数据可读，返回
+			}
+			else
+			{
+				Log::error("sockfd:%d recv error.", _sockfd);		// socket 读取错误
+				return false;
+			}
+		}
+		else
+		{
+			Log::info("sockfd:%d recv error, socket closed by peer.", _sockfd);	// socket 被关闭
+			return false;
+		}
+
+	} while (recvSize < bufSize);
+	
+	*size = recvSize;
+
+	return true;
+}
+
+bool Socket::send(const char* buf, int* size, int flag)
+{
+	const int bufSize = *size;
+	int sendSise = 0;
+	do {
+		ssize_t n = ::send(_sockfd, buf + sendSise, bufSize - sendSise, flag);
+		if (n >= 0)
+		{
+			sendSise += n;
+		}
+		else
+		{
+			if (errno == EINTR)
+			{
+				continue;		// 中断，重试
+			}
+			else if (errno == EAGAIN || errno == EWOULDBLOCK)
+			{
+				break;			// socket缓冲区没有空间可以写，返回
+			}
+			else
+			{
+				Log::error("sockfd:%d send error.", _sockfd);		// socket 发送错误
+				return false;
+			}
+		}
+	} while (sendSise < bufSize);
+
+	*size = sendSise;
+
+	return true;
+}
+  
+bool Socket::close()
+{
+	if (::shutdown(_sockfd, SHUT_WR) != 0)
+	{
+		Log::error("close socket error.sockfd:%d", _sockfd);
+		return false;
+	}
+	return true;
+}
+
+
