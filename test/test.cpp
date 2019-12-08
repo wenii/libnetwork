@@ -6,6 +6,8 @@
 int main()
 {
 	libnetwork::Socket socket;
+	socket.setNonblock();
+	socket.setTcpNodelay();
 	socket.listen("localhost", "9999");
 	libnetwork::Socket client = socket.accept();
 

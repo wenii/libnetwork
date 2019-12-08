@@ -1,5 +1,6 @@
 #ifndef __LIB_NETWORK_SOCKET_H__
 #define __LIB_NETWORK_SOCKET_H__
+#include <time.h>
 namespace libnetwork
 {
 	class Socket
@@ -14,13 +15,20 @@ namespace libnetwork
 
 	public:
 		// socket 可用
-		bool isValide();
+		bool isValide() const;
 
 		// 获取socket描述符
-		int getSockFD();
+		int getSockFD() const;
 
 	public:
-		// 建立连接
+		// 设置禁用Nagle算法
+		void setTcpNodelay();
+
+		// 设置非阻塞
+		void setNonblock();
+		
+	public:
+		// 建立连接  
 		bool connect(const char* host, const char* serv);
 
 		// 监听
@@ -38,9 +46,20 @@ namespace libnetwork
 		// 关闭连接
 		bool close();
 
+	private:
+		// 获取socket选项
+		bool getSockOpt(int level, int optname, void* optval, int* optlen);
+
+		// 设置socket选项
+		bool setSockOpt(int level, int optname, const void* optval, int optlen);
+
+		// 设置用户自定义socket参数
+		void setSockOptCustom();
 
 	private:
-		int _sockfd;		// socket 描述符  
+		int _sockfd;						// socket 描述符  
+		int _nodelay;						// 是否使用Nagle算法	TCP_NODELAY
+		bool _nonblock;						// 非阻塞设置
 	};
 }	// namespace libnetwork
 

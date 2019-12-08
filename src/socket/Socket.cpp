@@ -3,6 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <fcntl.h>
 #include "Log.h"
 #include "SocketUtils.h"
 
@@ -13,18 +16,40 @@ static const int LISTEN_QUEUE_LEN = 100;
 
 Socket::Socket()
 	: _sockfd(0)
+	, _nodelay(0)
+	, _nonblock(false)
 {
-
 }
 
 Socket::Socket(int sockfd)
 	: _sockfd(sockfd)
+	, _nodelay(0)
+	, _nonblock(false)
 {
-
 }
 
 Socket::~Socket()
 {
+}
+
+bool Socket::isValide() const
+{
+	_sockfd > 0;
+}
+
+int Socket::getSockFD() const
+{
+	return _sockfd;
+}
+
+void Socket::setTcpNodelay()
+{
+	_nodelay = 1;
+}
+
+void Socket::setNonblock()
+{
+	_nonblock = true;
 }
  
 bool Socket::connect(const char* host, const char* serv)
@@ -41,20 +66,23 @@ bool Socket::connect(const char* host, const char* serv)
 		Log::error("getaddrinfo() failed when connect. host:%s, serv:%s error:%s", host, serv, gai_strerror(n));
 		return false;
 	}
-	int sockfd = 0;
+
 	struct addrinfo* head = res;
 	do {
-		sockfd = ::socket(head->ai_family, head->ai_socktype, head->ai_protocol);
-		if (sockfd < 0)
+		_sockfd = ::socket(head->ai_family, head->ai_socktype, head->ai_protocol);
+		if (_sockfd < 0)
 		{
 			continue;
 		}
-		if (::connect(sockfd, head->ai_addr, head->ai_addrlen) == 0)
+
+		this->setSockOptCustom();
+
+		if (::connect(_sockfd, head->ai_addr, head->ai_addrlen) == 0)
 		{
 			Log::info("connect host:%s:%s success.", host, serv);
 			break;
 		}
-		::close(sockfd);
+		::close(_sockfd);
 		
 		head = res->ai_next;
 	} while (head != nullptr);
@@ -67,7 +95,6 @@ bool Socket::connect(const char* host, const char* serv)
 		return false;
 	}
 
-	_sockfd = sockfd;
 	return true;
 }
 
@@ -86,25 +113,26 @@ bool Socket::listen(const char* host, const char* serv)
 		Log::error("getaddrinfo() failed when listen. host:%s, serv:%s error:%s", host, serv, gai_strerror(n));
 		return false;
 	}
-	int listenfd = 0;
 	struct addrinfo* head = res;
 	do {
-		listenfd = ::socket(head->ai_family, head->ai_socktype, head->ai_protocol);
-		if (listenfd < 0)
+		_sockfd = ::socket(head->ai_family, head->ai_socktype, head->ai_protocol);
+		if (_sockfd < 0)
 		{
 			continue;
 		}
+
+		this->setSockOptCustom();
 		
 		const int on = 1;
-		::setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-		
-		if (::bind(listenfd, head->ai_addr, head->ai_addrlen) == 0)
+		this->setSockOpt(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+		if (::bind(_sockfd, head->ai_addr, head->ai_addrlen) == 0)
 		{
 			Log::info("bind host:%s:%s success.", host, serv);
 			break;
 		}
 
-		::close(listenfd);
+		::close(_sockfd);
 
 		head = res->ai_next;
 	} while (head != nullptr);
@@ -117,16 +145,13 @@ bool Socket::listen(const char* host, const char* serv)
 		return false;
 	}
 
-	if (::listen(listenfd, LISTEN_QUEUE_LEN) != 0)
+	if (::listen(_sockfd, LISTEN_QUEUE_LEN) != 0)
 	{
 		Log::error("listen error for %s:%s", host, serv);
 		return false;
 	}
 
-
-	_sockfd = listenfd;
-
-	Log::info("listen success for %s:%s fd:%d, addr:%s", host, serv, listenfd, SocketUtils::getSockLocalAddrInfo(listenfd));
+	Log::info("listen success for %s:%s fd:%d, addr:%s", host, serv, _sockfd, SocketUtils::getSockLocalAddrInfo(_sockfd));
 
 	return true;
 }
@@ -139,17 +164,11 @@ Socket Socket::accept()
 		Log::info("accept success for connfd:%d client:%s", connfd, SocketUtils::getSocketPeerAddrInfo(connfd));
 		return Socket(connfd);
 	}
+	else
+	{
+		Log::error("accept error.");
+	}
 	return Socket();
-}
-
-bool Socket::isValide()
-{
-	_sockfd > 0;
-}
-
-int Socket::getSockFD()
-{
-	return _sockfd;
 }
 
 bool Socket::recv(char* buf, int* size, int flag)
@@ -232,6 +251,60 @@ bool Socket::close()
 		return false;
 	}
 	return true;
+}
+
+bool Socket::getSockOpt(int level, int optname, void* optval, int* optlen)
+{
+	if (::getsockopt(_sockfd, level, optname, optval, (socklen_t*)optlen) != 0)
+	{
+		Log::error("getsockopt error. level:%d optname:%d", level, optname);
+		return false;
+	}
+	return true;
+}
+
+bool Socket::setSockOpt(int level, int optname, const void* optval, int optlen)
+{
+	if (::setsockopt(_sockfd, level, optname, optval, optlen) != 0)
+	{
+		Log::error("setsockopt error. level:%d optname:%d", level, optname);
+		return false;
+	}
+	return true;
+}
+
+void Socket::setSockOptCustom()
+{
+	// 是否使用Nagle算法
+	if (_nodelay == 1)	// 默认是使用Nagle算法
+	{
+		if(this->setSockOpt(IPPROTO_TCP, TCP_NODELAY, &_nodelay, sizeof(_nodelay)));
+		{
+			Log::info("setSockOptCustom:setSockOpt set TCP_NODELAY");
+		}
+	}	
+	
+	// 非阻塞设置
+	if (_nonblock)
+	{
+		int flags = 0;
+		if ((flags = fcntl(_sockfd, F_GETFL, 0)) != -1)
+		{
+			flags |= O_NONBLOCK;
+			if (fcntl(_sockfd, F_SETFL, flags) != -1)
+			{
+				Log::info("setSockOptCustom:fcntl set O_NONBLOCK");
+			}
+			else
+			{
+				Log::error("setSockOptCustom:fcntl F_SETFL error.");
+			}
+		}
+		else
+		{
+			Log::error("setSockOptCustom:fcntl F_GETFL error.");
+		}
+	}
 }
 
 
