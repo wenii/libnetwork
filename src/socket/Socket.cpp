@@ -17,14 +17,12 @@ static const int LISTEN_QUEUE_LEN = 100;
 Socket::Socket()
 	: _sockfd(0)
 	, _nodelay(0)
-	, _nonblock(false)
 {
 }
 
 Socket::Socket(int sockfd)
 	: _sockfd(sockfd)
 	, _nodelay(0)
-	, _nonblock(false)
 {
 }
 
@@ -45,11 +43,6 @@ int Socket::getSockFD() const
 void Socket::setTcpNodelay()
 {
 	_nodelay = 1;
-}
-
-void Socket::setNonblock()
-{
-	_nonblock = true;
 }
  
 bool Socket::connect(const char* host, const char* serv)
@@ -84,7 +77,7 @@ bool Socket::connect(const char* host, const char* serv)
 		}
 		::close(_sockfd);
 		
-		head = res->ai_next;
+		head = head->ai_next;
 	} while (head != nullptr);
 
 	::freeaddrinfo(res);
@@ -134,7 +127,7 @@ bool Socket::listen(const char* host, const char* serv)
 
 		::close(_sockfd);
 
-		head = res->ai_next;
+		head = head->ai_next;
 	} while (head != nullptr);
 	
 	::freeaddrinfo(res);
@@ -285,25 +278,22 @@ void Socket::setSockOptCustom()
 	}	
 	
 	// ∑«◊Ë»˚…Ë÷√
-	if (_nonblock)
+	int flags = 0;
+	if ((flags = fcntl(_sockfd, F_GETFL, 0)) != -1)
 	{
-		int flags = 0;
-		if ((flags = fcntl(_sockfd, F_GETFL, 0)) != -1)
+		flags |= O_NONBLOCK;
+		if (fcntl(_sockfd, F_SETFL, flags) != -1)
 		{
-			flags |= O_NONBLOCK;
-			if (fcntl(_sockfd, F_SETFL, flags) != -1)
-			{
-				Log::info("setSockOptCustom:fcntl set O_NONBLOCK");
-			}
-			else
-			{
-				Log::error("setSockOptCustom:fcntl F_SETFL error.");
-			}
+			Log::info("setSockOptCustom:fcntl set O_NONBLOCK");
 		}
 		else
 		{
-			Log::error("setSockOptCustom:fcntl F_GETFL error.");
+			Log::error("setSockOptCustom:fcntl F_SETFL error.");
 		}
+	}
+	else
+	{
+		Log::error("setSockOptCustom:fcntl F_GETFL error.");
 	}
 }
 

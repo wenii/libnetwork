@@ -23,9 +23,6 @@ namespace libnetwork
 	public:
 		// 设置禁用Nagle算法
 		void setTcpNodelay();
-
-		// 设置非阻塞
-		void setNonblock();
 		
 	public:
 		// 建立连接  
@@ -59,7 +56,6 @@ namespace libnetwork
 	private:
 		int _sockfd;						// socket 描述符  
 		int _nodelay;						// 是否使用Nagle算法	TCP_NODELAY
-		bool _nonblock;						// 非阻塞设置
 	};
 }	// namespace libnetwork
 
