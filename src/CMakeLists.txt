@@ -1,7 +1,7 @@
 
 set(SRC_LIST
+	"${CMAKE_CURRENT_LIST_DIR}/common/Log.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/socket/Socket.cpp"
-	"${CMAKE_CURRENT_LIST_DIR}/socket/Log.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/socket/SocketUtils.cpp"
 )
 
