@@ -4,22 +4,23 @@
       "name": "Linux-Debug",
       "generator": "Unix Makefiles",
       "configurationType": "Debug",
-      "cmakeExecutable": "/home/wen/bin/cmake",
+      "cmakeExecutable": "/home/dev/mscmake/bin/cmake",
       "remoteCopySourcesExclusionList": [ ".vs", ".git", "out" ],
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "linux_x64" ],
-      "remoteMachineName": "192123712;192.168.137.101 (username=root, port=22, authentication=Password)",
-      "remoteCMakeListsRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/src",
-      "remoteBuildRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/out/build/${name}",
-      "remoteInstallRoot": "$HOME/.vs/${projectDirName}/${workspaceHash}/out/install/${name}",
+      "remoteMachineName": "-1593064687;192.168.16.101 (username=dev, port=5555, authentication=Password)",
+      "remoteCMakeListsRoot": "$HOME/projects/${projectDirName}/${workspaceHash}/src",
+      "remoteBuildRoot": "$HOME/projects/${projectDirName}/${workspaceHash}/out/build/${name}",
+      "remoteInstallRoot": "$HOME/projects/${projectDirName}/${workspaceHash}/out/install/${name}",
       "remoteCopySources": true,
       "rsyncCommandArgs": "-t --delete --delete-excluded",
       "remoteCopyBuildOutput": false,
       "remoteCopySourcesMethod": "rsync",
       "addressSanitizerRuntimeFlags": "detect_leaks=0",
-      "variables": []
+      "variables": [],
+      "remotePostbuildCommand": "cp -r $HOME/projects/${projectDirName}/${workspaceHash}/src/server.cfg $HOME/projects/${projectDirName}/${workspaceHash}/out/build/${name}/test"
     }
   ]
 }

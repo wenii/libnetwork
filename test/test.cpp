@@ -1,28 +1,16 @@
 #include <iostream>
-#include "../src/socket/Socket.h"
+#include "../src/Socket.h"
 #include <thread>
 #include <chrono>
 #include <string.h>
+#include "../src/TcpServer.h"
+#include "../src/EventLoop.h"
+#include "TestServer.h"
+
+
 int main()
 {
-	libnetwork::Socket socket;
-	socket.setTcpNodelay();
-	socket.listen("localhost", "9999");
-	libnetwork::Socket client = socket.accept();
-
-	char buf[1024] = { 0 };
-	int size = 1024;
-
-	while (true)
-	{
-		int ret = client.recv(buf, &size);
-		std::cout << "recv msg:" << buf << "ret:" << ret << std::endl;
-		memset(buf, 0, size);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
-
-	std::cout << "recv msg:" << buf << std::endl;
-
-	std::cout << "hello libnetwork!" << std::endl;
+	libnetwork::TestServer testServer;
+	testServer.start();
 	return 0;
 }
