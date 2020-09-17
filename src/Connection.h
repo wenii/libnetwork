@@ -4,7 +4,7 @@
 #include <functional>
 namespace libnetwork
 {
-	class IOBuffer;
+	class RingBuffer;
 	class EventLoop;
 	class Connection
 	{
@@ -90,10 +90,10 @@ namespace libnetwork
 		int writeToTcpBuffer();
 
 		// 获取读缓存
-		IOBuffer* getReadBuffer();
+		RingBuffer* getReadBuffer();
 
 		// 获取写缓存
-		IOBuffer* getWriteBuffer();
+		RingBuffer* getWriteBuffer();
 
 		// 设置可读事件
 		bool enableRead();
@@ -109,8 +109,6 @@ namespace libnetwork
 		static void writeHandler(int fd, void* clientData);
 
 	private:
-		// 是否有数据要发送
-		bool haveDataToSend();
 
 		// 清理buffer
 		void clearBuffer();
@@ -126,8 +124,8 @@ namespace libnetwork
 		EventLoop* _eventLoop;		// 事件循环
 		ConnID _connectID;			// 客户端ID（递增）
 		int _fd;					// 文件描述符
-		IOBuffer* _readBuffer;		// 读buffer
-		IOBuffer* _writeBuffer;		// 写buffer
+		RingBuffer* _readBuffer;		// 读buffer
+		RingBuffer* _writeBuffer;		// 写buffer
 		int _state;					// 连接状态
 		int _type;					// 连接类型
 		int _lastTime;				// 最后一次通信时间

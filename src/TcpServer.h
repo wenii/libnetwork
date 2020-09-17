@@ -8,6 +8,7 @@ namespace libnetwork
 	class ConnectionDict;
 	class Timer;
 	class TimingWheel;
+	class Packet;
 	class TcpServer
 	{
 	public:
@@ -27,6 +28,9 @@ namespace libnetwork
 		// 接收数据接口
 		// 返回值 返回处理数据字节数
 		virtual int onRecv(ConnID connID, const char* buf, int size);
+
+		// 数据包
+		virtual void onPacket(ConnID connID, const Packet& packet);
 
 		// 接收到新的客户端连接
 		virtual void onAccept(ConnID connID);
@@ -100,9 +104,6 @@ namespace libnetwork
 
 		// 检查客户端连接是否存活
 		void checkClientConnectionAlive();
-
-		// 处理致命错误
-		void fatalErrorHandler(int sig);
 	public:
 		// 构造函数
 		TcpServer();

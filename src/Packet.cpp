@@ -1,63 +1,35 @@
 #include "Packet.h"
 #include <arpa/inet.h>
 #include <string.h>
+#include <assert.h>
 using namespace libnetwork;
 
 Packet::Packet()
 	: _size(0)
+	, _buffer(nullptr)
 {
 
 }
 
-int Packet::parsePacketSize(const char* buf)
+bool Packet::Unpacking(const char* buf, int size)
 {
-	int packetSize = 0;
+	assert(size >= Packet::PACKET_HEAD_SIZE);
+
+	uint16_t packetSize = 0;
 	memcpy(&packetSize, buf, Packet::PACKET_SIZE_BYTES);
-	return ntohl(packetSize);
-}
-
-bool Packet::isPacketLegal(int size)
-{
-	if (size < Packet::PACKET_HEAD_SIZE)
+	packetSize = ntohs(packetSize);
+	
+	if (packetSize > Packet::PACKET_HEAD_SIZE && packetSize < Packet::PACKET_MAX_SIZE)
 	{
-		return false;
+		_size = packetSize;
+		_buffer = buf;
+		return true;
 	}
-	return true;
+	return false;
 }
 
-void Packet::Unpacking(const char* buf, int size)
+void Packet::Packing(const char* data, int size)
 {
-	// 包大小
-	_size = size;
-	
-	// 协议名称
-	short protoNameLen = 0;
-	memcpy(&protoNameLen, buf + Packet::PACKET_SIZE_BYTES, Packet::PROTO_NAME_BYTES);
-	protoNameLen = ntohs(protoNameLen);
-
-	char protoName[1024] = { 0 };
-	memcpy(protoName, buf + Packet::PACKET_SIZE_BYTES + Packet::PROTO_NAME_BYTES, protoNameLen);
-	_protoName = protoName;
-
-	// 协议数据
-	_protoData.append(buf + Packet::PACKET_SIZE_BYTES + Packet::PROTO_NAME_BYTES + protoNameLen, size - Packet::PACKET_HEAD_SIZE + protoNameLen);
-}
-
-void Packet::Packing(const std::string& protoName, const std::string& protoData)
-{
-	const short protoNameLen = protoName.size();
-	// 包大小
-	_size = Packet::PACKET_HEAD_SIZE + protoNameLen + protoData.size();
-	
-	// 协议名称
-	_protoName = protoName;
-
-	// 包数据
-	const int size = htonl(_size);
-	const short nameLen = htons(protoNameLen);
-	_packetData.append((const char*)&size, Packet::PACKET_SIZE_BYTES);
-	_packetData.append((const char*)&nameLen, Packet::PROTO_NAME_BYTES);
-	_packetData.append(protoData);
 }
 
 int Packet::getSize() const
@@ -65,17 +37,17 @@ int Packet::getSize() const
 	return _size;
 }
 
-const std::string& Packet::getProtoName() const
+const char* Packet::getBuffer() const
 {
-	return _protoName;
+	return _buffer;
 }
 
-const std::string& Packet::getProtoData() const
+int Packet::getBodySize() const
 {
-	return _protoData;
+	return _size - Packet::PACKET_HEAD_SIZE;
+}
+const char* Packet::getBody() const
+{
+	return _buffer + Packet::PACKET_HEAD_SIZE;
 }
 
-const std::string& Packet::getData() const
-{
-	return _packetData;
-}

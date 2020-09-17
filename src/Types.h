@@ -1,9 +1,9 @@
 #ifndef __LIB_NETWORK_TYPES_H__
 #define __LIB_NETWORK_TYPES_H__
-
+#include <stdint.h>
 namespace libnetwork
 {
-	typedef long long ConnID;
+	typedef uint32_t ConnID;
 }	// namespace libnetwork
 
 

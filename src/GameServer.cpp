@@ -7,7 +7,7 @@ using namespace libnetwork;
 int GameServer::onRecv(ConnID connID, const char* buf, int size)
 {
 	int handleSize = 0;
-	while (size > Packet::PACKET_SIZE_BYTES)
+	while (size > Packet::PACKET_HEAD_SIZE)
 	{
 		const int packetSize = Packet::parsePacketSize(buf, size);
 		if (Packet::isPacketLegal(packetSize))
@@ -16,7 +16,7 @@ int GameServer::onRecv(ConnID connID, const char* buf, int size)
 			{
 				Packet packet;
 				packet.Unpacking(buf, packetSize);
-				onPacket(packet.getProtoName(), packet.getProtoData());
+				onPacket(connID, packet.getBody(), packet.getBodySize());
 				handleSize += packetSize;
 				size -= packetSize;
 				buf += handleSize;

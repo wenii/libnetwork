@@ -6,7 +6,7 @@ set(SRC_LIST
 	"${CMAKE_CURRENT_LIST_DIR}/EventLoop.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/TcpServer.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/Connection.cpp"
-	"${CMAKE_CURRENT_LIST_DIR}/IOBuffer.cpp"
+	"${CMAKE_CURRENT_LIST_DIR}/RingBuffer.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/SelectApi.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/Timer.cpp"
 	"${CMAKE_CURRENT_LIST_DIR}/TimingWheel.cpp"

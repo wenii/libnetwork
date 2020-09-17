@@ -1,4 +1,4 @@
-﻿#include "IOBuffer.h"
+﻿#include "RingBuffer.h"
 #include <new>
 #include <algorithm>
 #include <string.h>
@@ -11,11 +11,11 @@ static bool comp(int a, int b)
 	return a < b;
 }
 
-IOBuffer* IOBuffer::create(unsigned int size)
+RingBuffer* RingBuffer::create(unsigned int size)
 {
 	if (size > 0)
 	{
-		IOBuffer* obj = new(std::nothrow) IOBuffer();
+		RingBuffer* obj = new(std::nothrow) RingBuffer();
 		if (obj != nullptr)
 		{
 			obj->_buf = new(std::nothrow) char[size];
@@ -30,7 +30,7 @@ IOBuffer* IOBuffer::create(unsigned int size)
 	return nullptr;
 }
 
-IOBuffer::IOBuffer()
+RingBuffer::RingBuffer()
 	: _head(0)
 	, _tail(0)
 	, _size(0)
@@ -38,7 +38,7 @@ IOBuffer::IOBuffer()
 {
 }
 
-IOBuffer::~IOBuffer()
+RingBuffer::~RingBuffer()
 {
 	if (_buf != nullptr)
 	{
@@ -47,17 +47,17 @@ IOBuffer::~IOBuffer()
 	}
 }
 
-int IOBuffer::getUsedSize()
+int RingBuffer::getUsedSize()
 {
 	return (_tail & MASK) - (_head & MASK);
 }
 
-int IOBuffer::getWritableSize()
+int RingBuffer::getWritableSize()
 {
 	return _size - this->getUsedSize();
 }
 
-int IOBuffer::write(const char* buff, int size)
+int RingBuffer::write(const char* buff, int size)
 {
 	// 缓存可写大小
 	size = std::min(size, this->getWritableSize(), comp);
@@ -76,45 +76,55 @@ int IOBuffer::write(const char* buff, int size)
 	return size;
 }
 
-const char* IOBuffer::getHead()
+const char* RingBuffer::getHead()
 {
 	return _buf + (MASK & _head);
 }
 
-char* IOBuffer::getTail()
+char* RingBuffer::getTail()
 {
 	return _buf + (MASK & _tail);
 }
 
 
-int IOBuffer::getTailWritableSize()
+int RingBuffer::getTailWritableSize()
 {
 	return std::min(getWritableSize(), (int)(_size - (MASK & _tail)));
 }
 
-void IOBuffer::setWriteOffset(int offset)
+void RingBuffer::setWriteOffset(int offset)
 {
 	_tail += offset;
 }
 
-int IOBuffer::getReadableSize()
+int RingBuffer::getReadableSize()
 {
 	return std::min(this->getUsedSize(), (int)(_size - (_head & MASK)), comp);
 }
 
-void IOBuffer::setReadOffset(int offset)
+void RingBuffer::setReadOffset(int offset)
 {
 	_head += offset;
 }
 
-void IOBuffer::alignToLeft(int offset)
+void RingBuffer::alignToLeft(int offset)
 {
 	memcpy(_buf, _buf + offset, getUsedSize() - offset);
 	_tail = _tail - offset;
 }
 
-void IOBuffer::clear()
+void RingBuffer::clear()
 {
 	_head = 0;
 	_tail = 0;
+}
+
+bool RingBuffer::isEmpty()
+{
+	return _tail - _head == 0;
+}
+
+bool RingBuffer::isFull()
+{
+	return !isEmpty();
 }

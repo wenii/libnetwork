@@ -1,6 +1,6 @@
 #include "Connection.h"
 #include <new>
-#include "IOBuffer.h"
+#include "RingBuffer.h"
 #include <algorithm>
 #include "Socket.h"
 #include <assert.h>
@@ -66,8 +66,8 @@ Connection* Connection::create()
 	Connection* object = new(std::nothrow) Connection();
 	if (object != nullptr)
 	{
-		IOBuffer* readBuffer = IOBuffer::create(IOBuffer::BUFFER_SIZE);
-		IOBuffer* writeBuffer = IOBuffer::create(IOBuffer::BUFFER_SIZE);
+		RingBuffer* readBuffer = RingBuffer::create(RingBuffer::BUFFER_SIZE);
+		RingBuffer* writeBuffer = RingBuffer::create(RingBuffer::BUFFER_SIZE);
 		if (readBuffer != nullptr && writeBuffer != nullptr)
 		{
 			object->_readBuffer = readBuffer;
@@ -254,12 +254,12 @@ int Connection::writeToTcpBuffer()
 	return totalWriteSize;
 }
 
-IOBuffer* Connection::getReadBuffer()
+RingBuffer* Connection::getReadBuffer()
 {
 	return _readBuffer;
 }
 
-IOBuffer* Connection::getWriteBuffer()
+RingBuffer* Connection::getWriteBuffer()
 {
 	return _writeBuffer;
 }
@@ -276,34 +276,23 @@ void Connection::send(const char* buf, int size)
 	if (_state == CONNECT_STATE_CLOSED)
 		return;
 
-	int sendSize = size;
-	if (Socket::send(_fd, buf, &sendSize))
+	// 写入buf
+	if (_writeBuffer->isEmpty())
 	{
-		if (sendSize < size)
-		{
-			size = sendSize - size;
-
-			// 保存剩余未发送出去的数据
-			if (_writeBuffer->getWritableSize() >= size)
-			{
-				// 写入到应用层缓存
-				_writeBuffer->write(buf + sendSize, size);
-
-				// 添加写事件
-				_eventLoop->createFileEvent(getFD(), LN_WRITABLE, writeHandler, this);
-			}
-			else
-			{
-				Log::info("Connection::send buf is full, not ehough space to write. so disconnect this connect.");
-
-				// buffer已写满，该连接可能出现异常，关闭连接
-				close();
-			}
-		}
+		// 添加写事件
+		_eventLoop->createFileEvent(getFD(), LN_WRITABLE, writeHandler, this);
+	}
+	if (_writeBuffer->getWritableSize() >= size)
+	{
+		// 写入到应用层缓存
+		int writeSize = _writeBuffer->write(buf, size);
+		assert(writeSize == size);
 	}
 	else
 	{
-		// 写数据发生错误，关闭连接
+		Log::info("Connection::send buf is full, not ehough space to write. so disconnect this connect.");
+
+		// buffer已写满，该连接可能出现异常，关闭连接
 		close();
 	}
 }
@@ -327,16 +316,11 @@ void Connection::writeHandler(int fd, void* clientData)
 
 	self->writeToTcpBuffer();
 
-	if (self->_state == CONNECT_STATE_ESTABLISHED && !self->haveDataToSend())
+	if (self->_state == CONNECT_STATE_ESTABLISHED && self->_writeBuffer->isEmpty())
 	{
 		// 删除写事件
 		self->_eventLoop->deleteFileEvent(self->getFD(), LN_WRITABLE);
 	}
-}
-
-bool Connection::haveDataToSend()
-{
-	return _writeBuffer->getUsedSize();
 }
 
 void Connection::clearBuffer()

@@ -9,7 +9,7 @@
 #include <cerrno>
 #include <stdlib.h>
 #include "Connection.h"
-#include "IOBuffer.h"
+#include "RingBuffer.h"
 #include <assert.h>
 #include <new>
 #include "Timer.h"
@@ -20,6 +20,7 @@
 #include <chrono>
 #include <ostream>
 #include <fstream>
+#include "Packet.h"
 using namespace libnetwork;
 
 
@@ -118,9 +119,6 @@ void TcpServer::start()
 	signal(SIGPIPE, SIG_IGN);			// 忽略SIGPIPE消息
 
 	_eventLoop->addSignal(SIGINT);		// 停止
-	_eventLoop->addSignal(SIGABRT);		// 断言
-	_eventLoop->addSignal(SIGFPE);		// 浮点错误
-	_eventLoop->addSignal(SIGSEGV);		// 内存段错误
 	_eventLoop->createSignalEvent(TcpServer::signalHandler);
 
 	// 加载配置
@@ -145,7 +143,39 @@ void TcpServer::start()
 int TcpServer::onRecv(ConnID connID, const char* buf, int size)
 {
 	Log::info("waning the function TcpServer::onRecv() should be overwrite.");
-	return 0;
+	int handleSize = 0;
+	while (size > Packet::PACKET_HEAD_SIZE)
+	{
+		Packet packet;
+		if (packet.Unpacking(buf, size))
+		{
+			const int packetSize = packet.getSize();
+			if (packetSize <= size)
+			{
+				onPacket(connID, packet);
+				handleSize += packetSize;
+				size -= packetSize;
+				buf += handleSize;
+			}
+			else
+			{
+				break;
+			}
+		}
+		else
+		{
+			Log::info("GameServer::onRecv Unpacking failed. connID:%lld", connID);
+			// 主动关闭连接
+			disconnect(connID);
+			break;
+		}
+	}
+	return handleSize;
+}
+
+void TcpServer::onPacket(ConnID connID, const Packet& packet)
+{
+
 }
 
 void TcpServer::onAccept(ConnID connID)
@@ -244,7 +274,7 @@ void TcpServer::recvCompleteHandler(Connection* conn, void* target)
 	TcpServer* self = (TcpServer*)target;
 
 	// 通过onRecv接口传递数据到上层
-	IOBuffer* readBuffer = conn->getReadBuffer();
+	RingBuffer* readBuffer = conn->getReadBuffer();
 	const int readableSize = readBuffer->getReadableSize();
 	if (readableSize > 0)
 	{
@@ -324,12 +354,7 @@ void TcpServer::signalHandler(int sig, void* clientData)
 	{
 	case SIGINT:
 		self->onExit();
-		self->_eventLoop->stop = true;
-		break;
-	case SIGABRT:
-	case SIGFPE:
-	case SIGSEGV:
-		self->fatalErrorHandler(sig);
+		self->_eventLoop->stop();
 		break;
 	default:
 		Log::info("TcpServer::unkonwn sig:%d", sig);
@@ -599,6 +624,7 @@ void TcpServer::checkClientConnectionAlive()
 			{
 				if (TcpServer::getSecondTime() - conn->getLastTime() > _timeout)
 				{
+					Log::error("checkClientConnectionAlive client[%ld] timeout.", conn->getConnectID());
 					conn->close();
 				}
 			}
@@ -606,103 +632,3 @@ void TcpServer::checkClientConnectionAlive()
 		}
 	}
 }
-
-
-static std::string getCurrentSystemTime()
-{
-	auto tt = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	struct tm* ptm = localtime(&tt);
-	char date[60] = { 0 };
-	sprintf(date, "%d-%02d-%02d %02d:%02d:%02d",
-		(int)ptm->tm_year + 1900, (int)ptm->tm_mon + 1, (int)ptm->tm_mday,
-		(int)ptm->tm_hour, (int)ptm->tm_min, (int)ptm->tm_sec);
-	return std::string(date);
-}
-
-void TcpServer::fatalErrorHandler(int sig)
-{
-	static const char szSigMsg[][256] = {
-	"Received	SIGHUP",			// 1	/* Hangup (POSIX).  */
-	"Received	SIGINT",			// 2	/* Interrupt (ANSI).  */
-	"Received	SIGQUIT",		    // 3	/* Quit (POSIX).  */
-	"Received	SIGILL",		    // 4	/* Illegal instruction (ANSI).  */
-	"Received	SIGTRAP",		    // 5	/* Trace trap (POSIX).  */
-	"Received	SIGABRT",		    // 6	/* Abort (ANSI).  */
-	"Received	SIGBUS",		    // 7	/* BUS error (4.2 BSD).  */
-	"Received	SIGFPE",		    // 8	/* Floating-point exception (ANSI).  */
-	"Received	SIGKILL",		    // 9	/* Kill, unblockable (POSIX).  */
-	"Received	SIGUSR1",		    // 10	/* User-defined signal 1 (POSIX).  */
-	"Received	SIGSEGV	",		    // 11	/* Segmentation violation (ANSI).  */
-	"Received	SIGUSR2",		    // 12	/* User-defined signal 2 (POSIX).  */
-	"Received	SIGPIPE",		    // 13	/* Broken pipe (POSIX).  */
-	"Received	SIGALRM",		    // 14	/* Alarm clock (POSIX).  */
-	"Received	SIGTERM",		    // 15	/* Termination (ANSI).  */
-	"Received	SIGSTKFLT",		    // 16	/* Stack fault.  */
-	"Received	SIGCHLD",		    // 17	/* Child status has changed (POSIX).  */
-	"Received	SIGCONT",		    // 18	/* Continue (POSIX).  */
-	"Received	SIGSTOP",		    // 19	/* Stop, unblockable (POSIX).  */
-	"Received	SIGTSTP",		    // 20	/* Keyboard stop (POSIX).  */
-	"Received	SIGTTIN",		    // 21	/* Background read from tty (POSIX).  */
-	"Received	SIGTTOU",		    // 22	/* Background write to tty (POSIX).  */
-	"Received	SIGURG",		    // 23	/* Urgent condition on socket (4.2 BSD).  */
-	"Received	SIGXCPU",		    // 24	/* CPU limit exceeded (4.2 BSD).  */
-	"Received	SIGXFSZ",		    // 25	/* File size limit exceeded (4.2 BSD).  */
-	"Received	SIGVTALRM",		    // 26	/* Virtual alarm clock (4.2 BSD).  */
-	"Received	SIGPROF",		    // 27	/* Profiling alarm clock (4.2 BSD).  */
-	"Received	SIGWINCH",		    // 28	/* Window size change (4.3 BSD, Sun).  */
-	"Received	SIGIO",		        // 29	/* I/O now possible (4.2 BSD).  */
-	"Received	SIGPWR",		    // 30	/* Power failure restart (System V).  */
-	"Received   SIGSYS"				// 31	/* Bad system call.  */ };
-	};
-
-	const char* traceFileName = "trace.txt";
-	std::ofstream dumpFile;
-	dumpFile.open(traceFileName, std::ios::app);
-	if (!dumpFile.is_open())
-	{
-		Log::info("----------------------------------error------------------------------");
-		Log::info("----------------ErrorHandle::signalHanle() open file failed--------------");
-	}
-
-	void* pTrace[256];
-	char** ppszMsg = nullptr;
-	size_t uTraceSize = 0;
-
-	do {
-		if (0 == (uTraceSize = backtrace(pTrace, sizeof(pTrace) / sizeof(void*)))) {
-			break;
-		}
-		if (nullptr == (ppszMsg = backtrace_symbols(pTrace, uTraceSize))) {
-			break;
-		}
-		std::string curTime = getCurrentSystemTime();
-		char infobuffer[1024] = { 0 };
-		sprintf(infobuffer, "[%s]%s. call stack:\n", curTime.c_str(), szSigMsg[sig - 1]);
-		Log::info(infobuffer);
-		printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-		if (dumpFile.is_open())
-		{
-			dumpFile << infobuffer;
-			dumpFile << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++";
-			for (size_t i = 0; i < uTraceSize; ++i) {
-				dumpFile << ppszMsg[i] << std::endl;
-			}
-			dumpFile << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++";
-		}
-
-		for (size_t i = 0; i < uTraceSize; ++i) {
-			Log::info("%s", ppszMsg[i]);
-		}
-		Log::info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-	} while (0);
-
-	if (nullptr != ppszMsg) {
-		free(ppszMsg);
-		ppszMsg = nullptr;
-	}
-
-	dumpFile.close();
-
-	exit(0);
-}
-

@@ -1,5 +1,5 @@
-﻿#ifndef __LIB_NETWORK_IO_BUFFER_H__
-#define __LIB_NETWORK_IO_BUFFER_H__
+﻿#ifndef __LIB_NETWORK_RING_BUFFER_H__
+#define __LIB_NETWORK_RING_BUFFER_H__
 
 namespace libnetwork
 {
@@ -13,17 +13,17 @@ namespace libnetwork
 	 * 缓冲区满的情况:tail - head == size
 	 * 缓冲区的大小:tail - head
 	 */
-	class IOBuffer
+	class RingBuffer
 	{
 	public:
 		
 		// buffer大小1M
-		static const unsigned int BUFFER_SIZE = 1024 * 1024;
+		static const unsigned int BUFFER_SIZE = 64 * 1024;
 
 	public:
 		
 		// 创建对象
-		static IOBuffer* create(unsigned int size);
+		static RingBuffer* create(unsigned int size);
 
 		
 		// 销毁对象
@@ -67,14 +67,20 @@ namespace libnetwork
 		// 清理buffer
 		void clear();
 
+		// buffer是否空
+		bool isEmpty();
+
+		// buffer是否满
+		bool isFull();
+
 	private:
 		
 		// 构造函数
-		IOBuffer();
+		RingBuffer();
 
 		
 		// 析构函数
-		~IOBuffer();
+		~RingBuffer();
 
 	private:
 		volatile unsigned int _head;				// buffer输入端
@@ -86,4 +92,4 @@ namespace libnetwork
 }	// namespace libnetwork
 
 
-#endif // !__LIB_NETWORK_IO_BUFFER_H__
+#endif // !__LIB_NETWORK_RING_BUFFER_H__

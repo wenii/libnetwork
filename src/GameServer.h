@@ -13,7 +13,7 @@ namespace libnetwork
 		virtual void onAccept(ConnID connID) = 0;
 		virtual void onDisconnect(ConnID connID) = 0;
 		virtual void update() = 0;
-		virtual void onPacket(const std::string& protoName, const std::string& protoData) = 0;
+		virtual void onPacket(ConnID connID, const char* data, int size) = 0;
 
 	public:
 		void sendProto(ConnID connID, const std::string& protoName, const std::string& protoData);

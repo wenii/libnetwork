@@ -81,6 +81,9 @@ namespace libnetwork
 		// 执行事件循环
 		void run();
 
+		// 结束事件循环
+		void stop();
+
 		// 处理事件
 		int processEvents();
 		int processFileEvents(int eventCount);
@@ -115,7 +118,7 @@ namespace libnetwork
 		FileEvent* events;
 		FiredEvent* fired;
 		TimeEvent* timeEventHead;
-		int stop;
+		int _stop;
 		BeforeSleepProc* beforesleep;
 		PollerInterface* pollerApi;
 		void* clientData;

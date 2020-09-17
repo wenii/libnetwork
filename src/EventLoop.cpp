@@ -104,7 +104,7 @@ EventLoop::EventLoop()
 	, events(nullptr)
 	, fired(nullptr)
 	, timeEventHead(nullptr)
-	, stop(0)
+	, _stop(0)
 	, beforesleep(nullptr)
 	, pollerApi(nullptr)
 	, clientData(nullptr)
@@ -219,7 +219,7 @@ void EventLoop::createSignalEvent(SignalProc* proc)
 
 void EventLoop::run()
 {
-	while (!stop)
+	while (!_stop)
 	{
 		if (beforesleep != nullptr)
 		{
@@ -228,6 +228,11 @@ void EventLoop::run()
 		processEvents();
 	}
 	Log::info("EventLoop::run() loop exit.");
+}
+
+void EventLoop::stop()
+{
+	_stop = 1;
 }
 
 int EventLoop::processFileEvents(int eventCount)
@@ -239,16 +244,17 @@ int EventLoop::processFileEvents(int eventCount)
 		const int mask = fired[i].mask;
 
 		FileEvent& fe = events[fd];
+		if (fe.mask & mask & LN_WRITABLE)
+		{
+			if (fe.wFileProc)
+				fe.wFileProc(fd, fe.clientData);
+		}
 		if (fe.mask & mask & LN_READABLE)
 		{
 			if(fe.rFileProc)
 				fe.rFileProc(fd, fe.clientData);
 		}
-		if (fe.mask & mask & LN_WRITABLE)
-		{
-			if(fe.wFileProc)
-				fe.wFileProc(fd, fe.clientData);
-		}
+		
 		processed++;
 	}
 	return processed;
