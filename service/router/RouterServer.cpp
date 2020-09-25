@@ -3,6 +3,19 @@
 #include "../../src/Packet.h"
 #include "../../proto/RouterProtoPacket.h"
 #include <arpa/inet.h>
+#include "LuaState.h"
+
+RouterServer::RouterServer()
+{
+	_luaState = new LuaState();
+	
+	_luaState->loadFile("script/main.lua");
+}
+
+RouterServer::~RouterServer()
+{
+
+}
 
 void RouterServer::onPacket(ConnID connID, const Packet& packet)
 {
@@ -22,24 +35,28 @@ void RouterServer::onPacket(ConnID connID, const Packet& packet)
 	}
 }
 
-void RouterServer::onAccept(long long clientID)
+void RouterServer::onAccept(ConnID clientID)
 {
+	_luaState->onAccept(clientID);
+}
+
+void RouterServer::onDisconnect(ConnID clientID)
+{
+	_luaState->onDisconnect(clientID);
 
 }
 
-void RouterServer::onDisconnect(long long clientID)
+void RouterServer::update(int dt)
 {
-
-}
-
-void RouterServer::update()
-{
+	_luaState->update(dt);
 
 }
 
 void RouterServer::router(ConnID gateID, ConnID clientID, const char* data, int dataSize)
 {
 	// 路由消息到网关或者逻辑服
+	_luaState->onRouter(gateID, clientID, data, dataSize);
+
 }
 
 void RouterServer::sendToLogicServer(ConnID logicID, ConnID gateID, ConnID clientID, const char* data, int dataSize)
@@ -48,15 +65,15 @@ void RouterServer::sendToLogicServer(ConnID logicID, ConnID gateID, ConnID clien
 	packet.packing(gateID, clientID, data, dataSize);
 
 	uint16_t packetSize = packet.getSize();
-	uint32_t gateID = packet.getGateConnID();
-	uint32_t clientID = packet.getClientConnID();
+	uint32_t gateConnID = packet.getGateConnID();
+	uint32_t clientConnID = packet.getClientConnID();
 	packetSize = htons(packetSize);
-	gateID = htonl(gateID);
-	clientID = htonl(clientID);
+	gateConnID = htonl(gateConnID);
+	clientConnID = htonl(clientConnID);
 
 	send(logicID, (char*)&packetSize, RouterProtoPacket::PACKET_SIZE_BYTES);
-	send(logicID, (char*)&gateID, RouterProtoPacket::PACKET_GATE_ID_BYTES);
-	send(logicID, (char*)&clientID, RouterProtoPacket::PACKET_CLIENT_ID_BYTES);
+	send(logicID, (char*)&gateConnID, RouterProtoPacket::PACKET_GATE_ID_BYTES);
+	send(logicID, (char*)&clientConnID, RouterProtoPacket::PACKET_CLIENT_ID_BYTES);
 	send(logicID, data, dataSize);
 
 }
@@ -66,11 +83,11 @@ void RouterServer::sendToGateServer(ConnID gateID, ConnID clientID, const char* 
 	GateProtoPacket packet;
 	packet.packing(clientID, data, dataSize);
 	uint16_t packetSize = packet.getSize();
-	uint32_t clientID = packet.getClientConnID();
+	uint32_t clientConnID = packet.getClientConnID();
 	packetSize = htons(packetSize);
-	clientID = htonl(clientID);
+	clientConnID = htonl(clientConnID);
 
 	send(gateID, (char*)&packetSize, GateProtoPacket::PACKET_SIZE_BYTES);
-	send(gateID, (char*)&clientID, GateProtoPacket::PACKET_CLIENT_ID_BYTES);
+	send(gateID, (char*)&clientConnID, GateProtoPacket::PACKET_CLIENT_ID_BYTES);
 	send(gateID, data, dataSize);
 }

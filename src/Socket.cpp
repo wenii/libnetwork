@@ -223,7 +223,8 @@ int Socket::listen(const char* addr, const char* port, int proto, int backlog)
 		return -1;
 	}
 
-	Log::info("listen success for %s fd: %d, addr: %s", port, sockfd, getSockLocalAddrInfo(sockfd));
+	const char* localAddr = getSockLocalAddrInfo(sockfd);
+	Log::info("listen success for %s fd: %d, addr: %s", port, sockfd, localAddr ? localAddr :"??");
 	return sockfd;
 }
 
@@ -237,10 +238,14 @@ int Socket::accept(int fd, char* addr, int size)
 		// 监听套接字的非阻塞文件状态标志不会继承给accept返回的新套接字，需要显式设置。
 		Socket::setNonBlock(connfd);
 		const char* addrInfo = sockntop((struct sockaddr*) &ss);
-		Log::info("accept success for connfd:%d client:%s", connfd, addrInfo);
+		if (addrInfo) 
+		{
+			Log::info("accept success for connfd:%d client:%s", connfd, addrInfo);
 
-		if (addr && size)
-			snprintf(addr, size, addrInfo);
+			if (addr && size)
+				snprintf(addr, size, addrInfo);
+		}
+		
 	}
 	else
 	{

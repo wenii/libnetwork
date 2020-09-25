@@ -14,7 +14,7 @@ public:
 	virtual void onDisconnect(long long clientID);
 
 	// 更新
-	virtual void update();
+	virtual void update(int dt);
 
 public:
 	// 处理消息

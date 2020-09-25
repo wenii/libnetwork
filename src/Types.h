@@ -4,6 +4,7 @@
 namespace libnetwork
 {
 	typedef uint32_t ConnID;
+	const uint32_t INVALID_CONN = 0;
 }	// namespace libnetwork
 
 

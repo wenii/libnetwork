@@ -391,8 +391,8 @@ TimeEvent* EventLoop::getNearestTimeEvent()
 	TimeEvent* head = timeEventHead;
 	while (head != nullptr)
 	{
-		if (nearest == nullptr || nearest->when_sec < head->when_sec ||
-			(nearest->when_sec == head->when_sec && nearest->when_ms < head->when_ms))
+		if (nearest == nullptr || nearest->when_sec > head->when_sec ||
+			(nearest->when_sec == head->when_sec && nearest->when_ms > head->when_ms))
 		{
 			nearest = head;
 		}

@@ -24,13 +24,22 @@ namespace libnetwork
 		// 启动服务
 		void start();
 
+		// 连接服务
+		ConnID connect(const char* host, const char* port);
+		ConnID connect(const char* hostPair);
+
 	public:
+		// 初始化
+		virtual bool onInit();
+
 		// 接收数据接口
 		// 返回值 返回处理数据字节数
 		virtual int onRecv(ConnID connID, const char* buf, int size);
+		virtual int onRecvFromServer(ConnID connID, const char* buf, int size);
 
 		// 数据包
 		virtual void onPacket(ConnID connID, const Packet& packet);
+		virtual void onPacketFromServer(ConnID connID, const Packet& packet);
 
 		// 接收到新的客户端连接
 		virtual void onAccept(ConnID connID);
@@ -39,7 +48,7 @@ namespace libnetwork
 		virtual void onDisconnect(ConnID connID);
 
 		// 更新
-		virtual void update();
+		virtual void update(int dt);
 
 		// 服务退出
 		virtual void onExit();

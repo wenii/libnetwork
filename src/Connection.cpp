@@ -13,7 +13,8 @@ using namespace libnetwork;
 static ConnID genConnectID()
 {
 	static ConnID ID = 0;
-	return ID++;
+	while (!ID++);
+	return ID;
 }
 
 Connection* Connection::ObjectPool::create()
@@ -67,7 +68,7 @@ Connection* Connection::create()
 	if (object != nullptr)
 	{
 		RingBuffer* readBuffer = RingBuffer::create(RingBuffer::BUFFER_SIZE);
-		RingBuffer* writeBuffer = RingBuffer::create(RingBuffer::BUFFER_SIZE);
+		RingBuffer* writeBuffer = RingBuffer::create(RingBuffer::BUFFER_SIZE_1M);
 		if (readBuffer != nullptr && writeBuffer != nullptr)
 		{
 			object->_readBuffer = readBuffer;
@@ -276,24 +277,50 @@ void Connection::send(const char* buf, int size)
 	if (_state == CONNECT_STATE_CLOSED)
 		return;
 
-	// 写入buf
-	if (_writeBuffer->isEmpty())
+	const bool isBufferEmpty = _writeBuffer->isEmpty();
+
+	
+	if (!isBufferEmpty) 
 	{
-		// 添加写事件
-		_eventLoop->createFileEvent(getFD(), LN_WRITABLE, writeHandler, this);
+		// 将之前没有写完的写完
+		writeToTcpBuffer();
 	}
-	if (_writeBuffer->getWritableSize() >= size)
+	int sendSize = size;
+	if (_writeBuffer->isEmpty()) 
 	{
-		// 写入到应用层缓存
-		int writeSize = _writeBuffer->write(buf, size);
-		assert(writeSize == size);
+		// 先往tcp buf里面写
+		if (!Socket::send(_fd, buf, &sendSize))
+		{
+			Log::info("Connection::send error.");
+			close();
+			return;
+		}
 	}
 	else
 	{
-		Log::info("Connection::send buf is full, not ehough space to write. so disconnect this connect.");
+		sendSize = 0;
+	}
+	if (sendSize < size)
+	{
+		// 剩下的写到缓存
+		int leftSize = size - sendSize;
+		if (_writeBuffer->getWritableSize() >= leftSize)
+		{
+			// 写入到应用层缓存
+			int writeSize = _writeBuffer->write(buf + sendSize, leftSize);
+			assert(writeSize == leftSize);
+		}
+		else
+		{
+			Log::info("Connection::send buf is full, not ehough space to write. so disconnect this connect.");
 
-		// buffer已写满，该连接可能出现异常，关闭连接
-		close();
+			// buffer已写满，该连接可能出现异常，关闭连接
+			close();
+		}
+	}
+	else
+	{
+		// 全部写完
 	}
 }
 

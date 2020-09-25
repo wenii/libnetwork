@@ -18,7 +18,7 @@ namespace libnetwork
 		virtual void onDisconnect(long long clientID);
 
 		// ¸üÐÂ
-		virtual void update();
+		virtual void update(int dt);
 	};
 }
 

@@ -12,7 +12,7 @@ namespace libnetwork
 	public:
 		virtual void onAccept(ConnID connID) = 0;
 		virtual void onDisconnect(ConnID connID) = 0;
-		virtual void update() = 0;
+		virtual void update(int dt) = 0;
 		virtual void onPacket(ConnID connID, const char* data, int size) = 0;
 
 	public:

@@ -136,8 +136,61 @@ void TcpServer::start()
 	// 创建时间事件，以1s时间间隔运行,驱动定时器
 	_eventLoop->createTimeEven(1000, timerHandler, this, nullptr);
 
+	// 调用初始化函数
+	if (!onInit()) exit(0);
+
 	// 循环事件
 	_eventLoop->run();
+}
+
+ConnID TcpServer::connect(const char* host, const char* port)
+{
+	int sockfd = Socket::connect(host, port);
+	if (sockfd != -1) 
+	{
+		Log::info("TcpServer::connect:connect to server:%s fd:%d success.", host, sockfd);
+
+		Connection* serverConn = Connection::ObjectPool::create();
+		serverConn->setFD(sockfd);
+		serverConn->setEventLoop(_eventLoop);
+		if (serverConn->enableRead())
+		{
+			serverConn->setTarget(this);
+			serverConn->setRecvCompleteCallback(TcpServer::recvCompleteHandler);
+			serverConn->setDisconnectCallback(TcpServer::disconnectHandler);
+			serverConn->setConnectType(Connection::CONNECT_TYPE_SERVER);
+			serverConn->setLastTime(TcpServer::getSecondTime());
+			serverConn->established();
+
+			_conns->saveConnection(serverConn);
+			return serverConn->getConnectID();
+		}
+		else
+		{
+			Log::info("TcpServer::connect:new server connect while enable read, so close.:%lld fd:%d ip:%d", serverConn->getConnectID(), sockfd, host);
+
+			serverConn->close();
+			Connection::ObjectPool::free(serverConn);
+		}
+	}
+	return INVALID_CONN;
+}
+
+ConnID TcpServer::connect(const char* hostPair)
+{
+	std::string addr = hostPair;
+	std::string::size_type pos = addr.find_last_of(':');
+	if (pos != std::string::npos) 
+	{
+		std::string host = addr.substr(0, pos);
+		std::string port = addr.substr(pos + 1);
+		return connect(host.c_str(), port.c_str());
+	}
+}
+
+bool TcpServer::onInit()
+{
+	return true;
 }
 
 int TcpServer::onRecv(ConnID connID, const char* buf, int size)
@@ -173,7 +226,45 @@ int TcpServer::onRecv(ConnID connID, const char* buf, int size)
 	return handleSize;
 }
 
+int TcpServer::onRecvFromServer(ConnID connID, const char* buf, int size)
+{
+	Log::info("waning the function TcpServer::onRecv() should be overwrite.");
+	int handleSize = 0;
+	while (size > Packet::PACKET_HEAD_SIZE)
+	{
+		Packet packet;
+		if (packet.Unpacking(buf, size))
+		{
+			const int packetSize = packet.getSize();
+			if (packetSize <= size)
+			{
+				onPacketFromServer(connID, packet);
+				handleSize += packetSize;
+				size -= packetSize;
+				buf += handleSize;
+			}
+			else
+			{
+				break;
+			}
+		}
+		else
+		{
+			Log::info("GameServer::onRecv Unpacking failed. connID:%lld", connID);
+			// 主动关闭连接
+			disconnect(connID);
+			break;
+		}
+	}
+	return handleSize;
+}
+
 void TcpServer::onPacket(ConnID connID, const Packet& packet)
+{
+
+}
+
+void TcpServer::onPacketFromServer(ConnID connID, const Packet& packet)
 {
 
 }
@@ -188,7 +279,7 @@ void TcpServer::onDisconnect(ConnID connID)
 	Log::info("warning the function TcpServer::onDisconnect() shuld be overwrite.");
 }
 
-void TcpServer::update()
+void TcpServer::update(int dt)
 {
 	Log::info("warning the function TcpServer::update() shuld be overwrite.");
 }
@@ -278,7 +369,19 @@ void TcpServer::recvCompleteHandler(Connection* conn, void* target)
 	const int readableSize = readBuffer->getReadableSize();
 	if (readableSize > 0)
 	{
-		const int size = self->onRecv(conn->getConnectID(), readBuffer->getHead(), readableSize);
+		int size = 0;
+		if (conn->getConnectType() == Connection::CONNECT_TYPE_CLIENT)
+		{
+			size = self->onRecv(conn->getConnectID(), readBuffer->getHead(), readableSize);
+		}
+		else if (conn->getConnectType() == Connection::CONNECT_TYPE_SERVER)
+		{
+			size = self->onRecvFromServer(conn->getConnectID(), readBuffer->getHead(), readableSize);
+		}
+		else
+		{
+			assert(false);
+		}
 		assert(size <= readableSize);
 
 		self->_recvBytes += size;
@@ -305,6 +408,8 @@ int TcpServer::serverCron(long long id, void* clientData)
 {
 	TcpServer* self = (TcpServer*)clientData;
 
+	int lasteTime = TcpServer::millisTime;
+
 	// 更新缓存时间
 	self->updateCacheTime();
 
@@ -312,7 +417,8 @@ int TcpServer::serverCron(long long id, void* clientData)
 	self->clearDisconnect();
 
 	// 更新
-	self->update();
+	int dt = TcpServer::millisTime - lasteTime;
+	self->update(dt);
 
 	self->_cronLoops++;
 

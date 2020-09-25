@@ -7,6 +7,7 @@ namespace libnetwork
 	public:
 		// 建立连接  
 		static int connect(const char* host, const char* port);
+		
 
 		// 监听
 		static int listen(const char* addr, const char* port, int proto, int backlog);

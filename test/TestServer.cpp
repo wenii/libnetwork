@@ -42,7 +42,7 @@ void TestServer::onDisconnect(long long clientID)
 	printf("onDisconnect.clientID:%lld\n", clientID);
 }
 
-void TestServer::update()
+void TestServer::update(int dt)
 {
 	if (!isAddTimer)
 	{

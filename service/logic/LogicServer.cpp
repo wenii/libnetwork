@@ -19,7 +19,7 @@ void LogicServer::onDisconnect(long long clientID)
 
 }
 
-void LogicServer::update()
+void LogicServer::update(int dt)
 {
 
 }

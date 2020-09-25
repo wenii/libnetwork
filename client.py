@@ -15,7 +15,7 @@ def getErrorInfo(error):
 
 
 def test(host, port):
-    socket.setdefaulttimeout(2)
+    socket.setdefaulttimeout(100)
     errorMsg = ""
     result = -1
     s = None
@@ -37,7 +37,11 @@ def test(host, port):
             while 1:
                 print("请输入要发送的内容：")
                 msg = input()
-                s.send(msg.encode('utf-8'))
+                encodeStr = msg.encode('utf-8')
+                leng = len(encodeStr) + 2 + 4
+                s.send(struct.pack('>H', leng))
+                s.send(struct.pack('>I', 100))
+                s.send(encodeStr)
                 buf = s.recv(1024)
                 del msg
                 print('recv msg:' + buf.decode('utf-8'))

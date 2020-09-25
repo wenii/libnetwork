@@ -22,7 +22,7 @@ void EchoServer::onDisconnect(long long clientID)
 	std::cout << "client[" << clientID << "] disconnect" << std::endl;
 }
 
-void EchoServer::update()
+void EchoServer::update(int dt)
 {
 
 }

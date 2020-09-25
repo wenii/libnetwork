@@ -2,11 +2,20 @@
 #define __GATE_SERVER_H__
 #include "../../src/TcpServer.h"
 #include <string>
-class GateServer : public libnetwork::TcpServer
+#include <list>
+#include <vector>
+using namespace libnetwork;
+class ZookeeperClient;
+
+class GateServer : public TcpServer
 {
 public:
+	// 初始化
+	virtual bool onInit();
+
 	// 数据包
 	virtual void onPacket(ConnID connID, const Packet& packet);
+	virtual void onPacketFromServer(ConnID connID, const Packet& packet);
 
 	// 接收到新的客户端连接
 	virtual void onAccept(long long clientID);
@@ -15,7 +24,19 @@ public:
 	virtual void onDisconnect(long long clientID);
 
 	// 更新
-	virtual void update();
+	virtual void update(int dt);
+
+public:
+	// 服务列表通知
+	static void serviceListNotify(const std::string& path, const std::list<std::string>& datas, void* target);
+
+private:
+	// 查找服务信息
+	bool findService(const std::string& host);
+
+private:
+	ZookeeperClient* _zkClient;
+	std::vector<std::pair<ConnID, std::string>> _routerList;
 };
 
 

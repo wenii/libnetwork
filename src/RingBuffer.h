@@ -17,8 +17,9 @@ namespace libnetwork
 	{
 	public:
 		
-		// buffer大小1M
+		// buffer大小
 		static const unsigned int BUFFER_SIZE = 64 * 1024;
+		static const unsigned int BUFFER_SIZE_1M = 1024 * 1024;	
 
 	public:
 		

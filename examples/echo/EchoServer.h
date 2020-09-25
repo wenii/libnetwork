@@ -1,6 +1,7 @@
 #ifndef __ECHO_SERVER_H__
 #define __ECHO_SERVER_H__
 #include "../../src/TcpServer.h"
+#include "LuaState.h"
 
 class EchoServer : public libnetwork::TcpServer
 {
@@ -15,7 +16,7 @@ public:
 	virtual void onDisconnect(long long clientID);
 
 	// ¸üÐÂ
-	virtual void update();
+	virtual void update(int dt);
 };
 
 
