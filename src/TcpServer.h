@@ -16,7 +16,7 @@ namespace libnetwork
 		static const int BINDADDR_MAX = 16;
 		static const int TCP_BACK_LOG_DEFAULT = 128;
 		static const int SEVER_RUN_HZ_DEFAULT = 10;
-		static const int LISTEN_PORT_DEFAULT = 9042;
+		static const int LISTEN_PORT_LEN = 8;
 		static const int CONFIG_MAX_LINE = 1024;
 		static const int CLIENT_LIST_COUNT = 1024;
 		static const int CONNECT_TIMEOUT_DEFAULT = 10;
@@ -70,6 +70,9 @@ namespace libnetwork
 
 		// 获取时间戳（毫秒）
 		static long long getMillisTiime();
+
+		// 读图配置
+		static void loadConfig(const char* fileName, std::function<bool(const char*, const char*)> call);
 	
 	private:
 		// 接收客户端连接回调
@@ -135,7 +138,7 @@ namespace libnetwork
 		int _bindaAddrCount;					// 实际地址数量
 		int _ipFD[BINDADDR_MAX];				// 监听文件描述符
 		int _ipFDCount;							// 实际监听文件描述符个数
-		int _port;								// 监听端口
+		char _port[LISTEN_PORT_LEN];			// 监听端口
 		int _backLog;							// 连接队列大小
 		int _hz;								// 服务器运行频率
 		int _timeout;							// 允许客户端连接最大空闲时间（秒）

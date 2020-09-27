@@ -59,7 +59,6 @@ TcpServer::TcpServer()
 	: _eventLoop(nullptr)
 	, _bindaAddrCount(0)
 	, _ipFDCount(0)
-	, _port(LISTEN_PORT_DEFAULT)
 	, _backLog(TCP_BACK_LOG_DEFAULT)
 	, _hz(SEVER_RUN_HZ_DEFAULT)
 	, _timeout(CONNECT_TIMEOUT_DEFAULT)
@@ -71,13 +70,17 @@ TcpServer::TcpServer()
 	, _checkClientAliveIndex(0)
 	, _timingWheel(nullptr)
 {
+	memset(_port, 0, LISTEN_PORT_LEN);
+
 	_eventLoop = EventLoop::create(CLIENT_LIST_COUNT);
 
-	for (int i = 0; i < BINDADDR_MAX; ++i)
-	{
-		_bindAddr[i] = nullptr;
-		_ipFD[i] = -1;
-	}
+	//for (int i = 0; i < BINDADDR_MAX; ++i)
+	//{
+	//	_bindAddr[i] = nullptr;
+	//	_ipFD[i] = -1;
+	//}
+	memset(_bindAddr, 0, BINDADDR_MAX);
+	memset(_ipFD, -1, BINDADDR_MAX);
 
 	_eventLoop->beforesleep = beforeSleepHandler;
 	_eventLoop->clientData = this;
@@ -450,7 +453,7 @@ static bool isIntagerString(const char* str)
 }
 
 
-void TcpServer::loadConfig(const char* fileName)
+void TcpServer::loadConfig(const char* fileName, std::function<bool(const char*, const char*)> call)
 {
 	FILE* pf = fopen(fileName, "r");
 	if (pf == nullptr)
@@ -473,7 +476,7 @@ void TcpServer::loadConfig(const char* fileName)
 		if (*p == '\r' || *p == '\n' || *p == '#')	// 忽略空行,注释行
 		{
 			memset(buf, 0, CONFIG_MAX_LINE + 1);
-			continue;	
+			continue;
 		}
 
 		// 解析字段
@@ -481,7 +484,7 @@ void TcpServer::loadConfig(const char* fileName)
 		while (fieldIndex < 128)
 		{
 			char c = *p;
-			if (c == '\r' || c == '\n') goto err;
+			if (c == '\r' || c == '\n' || c == '#') goto err;
 			if (c == ' ' || c == '\t') break;
 			field[fieldIndex++] = c;
 			p++;
@@ -499,6 +502,7 @@ void TcpServer::loadConfig(const char* fileName)
 			if (*p == ' ' || *p == '\t')
 			{
 				while (*p == ' ' || *p == '\t') p++;
+				if (*p == '\r' || *p == '\n' || *p == '#') break;
 				valueIndex1++;
 				valueIndex2 = 0;
 			}
@@ -508,63 +512,14 @@ void TcpServer::loadConfig(const char* fileName)
 		}
 
 		if (strlen(value[valueIndex1]) == 0) goto err;	// 没有值
-		if (!strcmp(field, CONFIG_FILED_BIND))
+
+		for (int i = 0; i < valueIndex1 + 1; ++i)
 		{
-			for(int i = 0; i < valueIndex1 + 1; ++i)
+			int len = strlen(value[i]);
+			if (len > 0)
 			{
-				int len = strlen(value[i]);
-				if (len > 0)
-				{
-					char* newValue = new char[len + 1];
-					newValue[len] = '\0';
-					strncpy(newValue, value[i], len);
-
-					_bindAddr[_bindaAddrCount] = newValue;
-					_bindaAddrCount += 1;
-				}
+				if (!call(field, value[i])) goto err;
 			}
-		}
-		else if (!strcmp(field, CONFIG_FILED_PORT))
-		{
-			int len = strlen(value[0]);
-			if (len == 0)goto err;
-
-			const char* v = value[0];
-			if (!isIntagerString(v)) goto err;
-			_port = atoi(v);
-
-		}
-		else if (!strcmp(field, CONFIG_FILED_BACKLOG))
-		{
-			int len = strlen(value[0]);
-			if (len == 0)goto err;
-
-			const char* v = value[0];
-			if (!isIntagerString(v)) goto err;
-			_backLog = atoi(v);
-			
-		}
-		else if (!strcmp(field, CONFIG_FILED_HZ))
-		{
-			int len = strlen(value[0]);
-			if (len == 0)goto err;
-
-			const char* v = value[0];
-			if (!isIntagerString(v)) goto err;
-			_hz = atoi(v);
-		}
-		else if (!strcmp(field, CONFIG_FILED_TIMEOUT))
-		{
-			int len = strlen(value[0]);
-			if (len == 0)goto err;
-
-			const char* v = value[0];
-			if (!isIntagerString(v)) goto err;
-			_timeout = atoi(v);
-		}
-		else
-		{
-			goto err;
 		}
 
 		memset(buf, 0, CONFIG_MAX_LINE + 1);
@@ -579,10 +534,47 @@ err:
 }
 
 
+void TcpServer::loadConfig(const char* fileName)
+{
+	TcpServer::loadConfig(fileName, [this](const char* field, const char* value) ->bool {
+		const int len = strlen(value);
+		if (!strcmp(field, CONFIG_FILED_BIND))
+		{
+			char* newValue = new char[len + 1];
+			newValue[len] = '\0';
+			strncpy(newValue, value, len);
+
+			_bindAddr[_bindaAddrCount] = newValue;
+			_bindaAddrCount += 1;
+			return true;
+		}
+		else if (!strcmp(field, CONFIG_FILED_PORT))
+		{
+			strncpy(_port, value, len);
+			return true;
+		}
+		else if (!strcmp(field, CONFIG_FILED_BACKLOG))
+		{
+			_backLog = atoi(value);
+			return _backLog > 0;
+		}
+		else if (!strcmp(field, CONFIG_FILED_HZ))
+		{
+			_hz = atoi(value);
+			return _hz > 0;
+		}
+		else if (!strcmp(field, CONFIG_FILED_TIMEOUT))
+		{
+			_timeout = atoi(value);
+			return true;
+		}
+		return false;
+	});
+}
+
+
 bool TcpServer::listen()
 {
-	char strPort[32] = { 0 };
-	snprintf(strPort, 32, "%d", _port);
 	for (int i = 0; i < _bindaAddrCount || i == 0; ++i)
 	{
 		const char* bindAddr = _bindAddr[i];
@@ -590,7 +582,7 @@ bool TcpServer::listen()
 		{
 			// 当未指定绑定地址时，绑定IPv6 0::0 和IPv4 0.0.0.0
 			int fd = -1;
-			if ((fd = Socket::listenToPortWithIPv6(nullptr, strPort, _backLog)) != -1)
+			if ((fd = Socket::listenToPortWithIPv6(nullptr, _port, _backLog)) != -1)
 			{
 				_ipFD[_ipFDCount++] = fd;
 			}
@@ -603,7 +595,7 @@ bool TcpServer::listen()
 				Log::error("ListenToPortWithIPv6 failed.");
 			}
 		
-			if ((fd = Socket::listenToPortWithIPv4(nullptr, strPort, _backLog)) != -1)
+			if ((fd = Socket::listenToPortWithIPv4(nullptr, _port, _backLog)) != -1)
 			{
 				_ipFD[_ipFDCount++] = fd;
 			}
@@ -626,12 +618,12 @@ bool TcpServer::listen()
 		else if (strchr(_bindAddr[i], ':') != nullptr)
 		{
 			// 绑定IPv6地址
-			_ipFD[_ipFDCount] = Socket::listenToPortWithIPv6(bindAddr, strPort, _backLog);
+			_ipFD[_ipFDCount] = Socket::listenToPortWithIPv6(bindAddr, _port, _backLog);
 		}
 		else
 		{
 			// 绑定IPv4地址
-			_ipFD[_ipFDCount] = Socket::listenToPortWithIPv4(bindAddr, strPort, _backLog);
+			_ipFD[_ipFDCount] = Socket::listenToPortWithIPv4(bindAddr, _port, _backLog);
 
 		}
 		if (_ipFD[_ipFDCount] == -1)
