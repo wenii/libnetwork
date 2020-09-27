@@ -31,8 +31,8 @@ public:
 	static void serviceListNotify(const std::string& path, const std::list<std::string>& datas, void* target);
 
 private:
-	// 查找服务信息
-	bool findService(const std::string& host);
+	// 获取路由服务连接
+	ConnID findRouterServiceID(ConnID clientID);
 
 private:
 	ZookeeperClient* _zkClient;

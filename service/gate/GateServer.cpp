@@ -13,7 +13,7 @@ bool GateServer::onInit()
 	_zkClient = new ZookeeperClient(ZOOKEEPER_HOST, 5);
 	_zkClient->addWatchServicePath(SERVICE_ROUTER_NAME);
 	_zkClient->setCallback(serviceListNotify, this);
-	_zkClient->connectToZookeeper();
+	return _zkClient->connectToZookeeper();
 }
 
 void GateServer::onPacket(ConnID connID, const Packet& packet)
@@ -25,14 +25,17 @@ void GateServer::onPacket(ConnID connID, const Packet& packet)
 	// 转发包到路由服
 	uint16_t packetSize = gateProtoPacket.getSize();
 	packetSize = htons(packetSize);
-	ConnID routerID = 0;
-	send(routerID, (char*)&packetSize, sizeof(GateProtoPacket::PACKET_SIZE_BYTES));
+	ConnID routerID = findRouterServiceID(connID);
+	if (routerID != INVALID_CONN)
+	{
+		send(routerID, (char*)&packetSize, sizeof(GateProtoPacket::PACKET_SIZE_BYTES));
 
-	uint32_t clientConnID = gateProtoPacket.getClientConnID();
-	clientConnID = htonl(clientConnID);
-	send(routerID, (char*)&clientConnID, sizeof(GateProtoPacket::PACKET_CLIENT_ID_BYTES));
+		uint32_t clientConnID = gateProtoPacket.getClientConnID();
+		clientConnID = htonl(clientConnID);
+		send(routerID, (char*)&clientConnID, sizeof(GateProtoPacket::PACKET_CLIENT_ID_BYTES));
 
-	send(routerID, gateProtoPacket.getBody(), gateProtoPacket.getBodySize());
+		send(routerID, gateProtoPacket.getBody(), gateProtoPacket.getBodySize());
+	}
 }
 
 void GateServer::onPacketFromServer(ConnID connID, const Packet& packet)
@@ -89,14 +92,17 @@ void GateServer::serviceListNotify(const std::string& path, const std::list<std:
 	}
 }
 
-bool GateServer::findService(const std::string& host)
+ConnID GateServer::findRouterServiceID(ConnID clientID)
 {
-	for (auto itr = _routerList.begin(); itr != _routerList.end(); ++itr) 
+	const int size = _routerList.size();
+	if (size != 0)
 	{
-		if (itr->second == host)
-		{
-			return true;
-		}
+		const int index = clientID % size;
+		return _routerList[index].first;
 	}
-	return false;
+	else
+	{
+		printf("no router service find.\n");
+		return INVALID_CONN;
+	}
 }

@@ -3,10 +3,10 @@
 #include "LuaState.h"
 int main()
 {
-	//EchoServer echoServer;
-	//echoServer.start();
+	EchoServer echoServer;
+	echoServer.start();
 
-	LuaState state;
-	state.test();
+	//LuaState state;
+	//state.test();
 	return 0;
 }

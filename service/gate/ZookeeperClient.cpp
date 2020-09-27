@@ -59,7 +59,6 @@ void ZookeeperClient::onConnected()
 void ZookeeperClient::onZnodeDelete(const std::string& path)
 {
 	// 注册服务
-	ZookeeperHandle* zkHandle = getZkHandle();
 	if (_path == path)
 	{
 		if (registerService()) 
@@ -122,9 +121,44 @@ void ZookeeperClient::getServiceList(const std::string& path)
 	{
 		if (_serverListChangeCb && _target)
 		{
-			std::list<std::string> datas;
-			zkHandle->getChildren(path, datas, true);
-			(*_serverListChangeCb)(path, datas, _target);
+			std::list<std::string> childrenPathNameArray;
+			std::list<std::string> serviceInfoArray;
+			zkHandle->getChildren(path, childrenPathNameArray, true);
+			std::list<std::string> newServiceList;
+			for (auto itr = childrenPathNameArray.begin(); itr != childrenPathNameArray.end(); ++itr)
+			{
+				const std::string& childrenPath = *itr;
+				std::string fullPath = path + "/" + childrenPath;
+				char buffer[1024] = { 0 };
+				int size = 1024;
+				if (zkHandle->getData(fullPath, buffer, &size))
+				{
+					if (!findFromServiceList(buffer))
+					{
+						// 新增
+						newServiceList.push_back(buffer);
+					}
+					serviceInfoArray.push_back(buffer);
+				}
+
+				
+			}
+			_serviceList.swap(serviceInfoArray);
+
+			(*_serverListChangeCb)(path, newServiceList, _target);
 		}
 	}
+}
+
+bool ZookeeperClient::findFromServiceList(const std::string& serviceInfo)
+{
+	for (auto itr = _serviceList.begin(); itr != _serviceList.end(); ++itr)
+	{
+		const std::string& info = *itr;
+		if (info == serviceInfo)
+		{
+			return true;
+		}
+	}
+	return false;
 }

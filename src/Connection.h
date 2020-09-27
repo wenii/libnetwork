@@ -73,9 +73,7 @@ namespace libnetwork
 		void setLastTime(int time);
 
 		// 设置回调函数
-		void setRecvCompleteCallback(RecvCompleteCallback* callback);
-		void setDisconnectCallback(DisconnectCallback* callback);
-		void setTarget(void* target);
+		void setCallback(const std::function<void(Connection*)>& recvCompleteCallback, const std::function<void(Connection*)>& disconnectCallback);
 
 		// 建立连接
 		void established();
@@ -129,9 +127,8 @@ namespace libnetwork
 		int _state;					// 连接状态
 		int _type;					// 连接类型
 		int _lastTime;				// 最后一次通信时间
-		RecvCompleteCallback* _onRecvComplete;	// 接收数据完成
-		DisconnectCallback* _onDisconnect;		// 断开连接回调
-		void* _target;					// 回调目标
+		std::function<void(Connection*)> _onRecvCompleteCallback;		// 接收数据完成
+		std::function<void(Connection*)> _onDisconnectCallback;			// 断开连接回调
 
 	public:
 		Connection* next;			// 下一个连接

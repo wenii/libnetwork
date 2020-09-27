@@ -94,9 +94,6 @@ Connection::Connection()
 	, _state(CONNECT_STATE_NONE)
 	, _type(0)
 	, _lastTime(0)
-	, _onRecvComplete(nullptr)
-	, _onDisconnect(nullptr)
-	, _target(nullptr)
 	, next(nullptr)
 {
 
@@ -162,19 +159,11 @@ void Connection::setLastTime(int time)
 	_lastTime = time;
 }
 
-void Connection::setRecvCompleteCallback(RecvCompleteCallback* callback)
-{
-	_onRecvComplete = callback;
-}
 
-void Connection::setDisconnectCallback(DisconnectCallback* callback)
+void Connection::setCallback(const std::function<void(Connection*)>& recvCompleteCallback, const std::function<void(Connection*)>& disconnectCallback)
 {
-	_onDisconnect = callback;
-}
-
-void Connection::setTarget(void* target)
-{
-	_target = target;
+	_onRecvCompleteCallback = recvCompleteCallback;
+	_onDisconnectCallback = disconnectCallback;
 }
 
 void Connection::established()
@@ -194,7 +183,7 @@ void Connection::close()
 	_state = CONNECT_STATE_CLOSED;
 
 	// 通知连接断开
-	_onDisconnect(this, _target);
+	_onDisconnectCallback(this);
 }
 
 int Connection::readFromTcpBuffer()
@@ -333,7 +322,7 @@ void Connection::readHandler(int fd, void* clientData)
 	if (self->_state == CONNECT_STATE_ESTABLISHED)
 	{
 		// 通知读取数据
-		self->_onRecvComplete(self, self->_target);
+		self->_onRecvCompleteCallback(self);
 	}
 }
 

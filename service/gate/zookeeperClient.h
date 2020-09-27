@@ -31,12 +31,14 @@ private:
 
 	// 获取服务列表
 	void getServiceList(const std::string& path);
+	bool findFromServiceList(const std::string& serviceInfo);
 
 private:
 	std::string _path;		// 服务路径
 	void* _target;
 	ServiceListChangeCallback _serverListChangeCb;
 	std::list<std::string> _watchList;
+	std::list<std::string> _serviceList;
 };
 
 

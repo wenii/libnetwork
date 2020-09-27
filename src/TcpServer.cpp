@@ -155,9 +155,7 @@ ConnID TcpServer::connect(const char* host, const char* port)
 		serverConn->setEventLoop(_eventLoop);
 		if (serverConn->enableRead())
 		{
-			serverConn->setTarget(this);
-			serverConn->setRecvCompleteCallback(TcpServer::recvCompleteHandler);
-			serverConn->setDisconnectCallback(TcpServer::disconnectHandler);
+			serverConn->setCallback(std::bind(&TcpServer::recvCompleteHandler, this, std::placeholders::_1), std::bind(&TcpServer::disconnectHandler, this, std::placeholders::_1));
 			serverConn->setConnectType(Connection::CONNECT_TYPE_SERVER);
 			serverConn->setLastTime(TcpServer::getSecondTime());
 			serverConn->established();
@@ -186,6 +184,7 @@ ConnID TcpServer::connect(const char* hostPair)
 		std::string port = addr.substr(pos + 1);
 		return connect(host.c_str(), port.c_str());
 	}
+	return INVALID_CONN;
 }
 
 bool TcpServer::onInit()
@@ -193,7 +192,7 @@ bool TcpServer::onInit()
 	return true;
 }
 
-int TcpServer::onRecv(ConnID connID, const char* buf, int size)
+int TcpServer::parsePacket(ConnID connID, const char* buf, int size, std::function<void(ConnID, const Packet&)> onPacketCall)
 {
 	Log::info("waning the function TcpServer::onRecv() should be overwrite.");
 	int handleSize = 0;
@@ -205,7 +204,7 @@ int TcpServer::onRecv(ConnID connID, const char* buf, int size)
 			const int packetSize = packet.getSize();
 			if (packetSize <= size)
 			{
-				onPacket(connID, packet);
+				onPacketCall(connID, packet);
 				handleSize += packetSize;
 				size -= packetSize;
 				buf += handleSize;
@@ -226,37 +225,15 @@ int TcpServer::onRecv(ConnID connID, const char* buf, int size)
 	return handleSize;
 }
 
+int TcpServer::onRecv(ConnID connID, const char* buf, int size)
+{
+	return parsePacket(connID, buf, size, std::bind(&TcpServer::onPacket, this, std::placeholders::_1, std::placeholders::_2));
+
+}
+
 int TcpServer::onRecvFromServer(ConnID connID, const char* buf, int size)
 {
-	Log::info("waning the function TcpServer::onRecv() should be overwrite.");
-	int handleSize = 0;
-	while (size > Packet::PACKET_HEAD_SIZE)
-	{
-		Packet packet;
-		if (packet.Unpacking(buf, size))
-		{
-			const int packetSize = packet.getSize();
-			if (packetSize <= size)
-			{
-				onPacketFromServer(connID, packet);
-				handleSize += packetSize;
-				size -= packetSize;
-				buf += handleSize;
-			}
-			else
-			{
-				break;
-			}
-		}
-		else
-		{
-			Log::info("GameServer::onRecv Unpacking failed. connID:%lld", connID);
-			// 主动关闭连接
-			disconnect(connID);
-			break;
-		}
-	}
-	return handleSize;
+	return parsePacket(connID, buf, size, std::bind(&TcpServer::onPacketFromServer, this, std::placeholders::_1, std::placeholders::_2));
 }
 
 void TcpServer::onPacket(ConnID connID, const Packet& packet)
@@ -339,10 +316,7 @@ void TcpServer::acceptHandler(int listenFD, void* clientData)
 		if (clientConn->enableRead())
 		{
 			Log::info("TcpServer::acceptHandler:new client:%lld fd:%d ip:%s", clientConn->getConnectID(), clientFD, clientAddr);
-
-			clientConn->setTarget(self);
-			clientConn->setRecvCompleteCallback(TcpServer::recvCompleteHandler);
-			clientConn->setDisconnectCallback(TcpServer::disconnectHandler);
+			clientConn->setCallback(std::bind(&TcpServer::recvCompleteHandler, self, std::placeholders::_1), std::bind(&TcpServer::disconnectHandler, self, std::placeholders::_1));
 			clientConn->setConnectType(Connection::CONNECT_TYPE_CLIENT);
 			clientConn->setLastTime(TcpServer::getSecondTime());
 			clientConn->established();
@@ -360,10 +334,8 @@ void TcpServer::acceptHandler(int listenFD, void* clientData)
 	}
 }
 
-void TcpServer::recvCompleteHandler(Connection* conn, void* target)
+void TcpServer::recvCompleteHandler(Connection* conn)
 {
-	TcpServer* self = (TcpServer*)target;
-
 	// 通过onRecv接口传递数据到上层
 	RingBuffer* readBuffer = conn->getReadBuffer();
 	const int readableSize = readBuffer->getReadableSize();
@@ -372,11 +344,11 @@ void TcpServer::recvCompleteHandler(Connection* conn, void* target)
 		int size = 0;
 		if (conn->getConnectType() == Connection::CONNECT_TYPE_CLIENT)
 		{
-			size = self->onRecv(conn->getConnectID(), readBuffer->getHead(), readableSize);
+			size = onRecv(conn->getConnectID(), readBuffer->getHead(), readableSize);
 		}
 		else if (conn->getConnectType() == Connection::CONNECT_TYPE_SERVER)
 		{
-			size = self->onRecvFromServer(conn->getConnectID(), readBuffer->getHead(), readableSize);
+			size = onRecvFromServer(conn->getConnectID(), readBuffer->getHead(), readableSize);
 		}
 		else
 		{
@@ -384,7 +356,7 @@ void TcpServer::recvCompleteHandler(Connection* conn, void* target)
 		}
 		assert(size <= readableSize);
 
-		self->_recvBytes += size;
+		_recvBytes += size;
 
 		readBuffer->alignToLeft(size);
 	}
@@ -392,16 +364,14 @@ void TcpServer::recvCompleteHandler(Connection* conn, void* target)
 	conn->setLastTime(TcpServer::getSecondTime());
 }
 
-void TcpServer::disconnectHandler(Connection* conn, void* target)
+void TcpServer::disconnectHandler(Connection* conn)
 {
-	TcpServer* self = (TcpServer*)target;
-
 	// 从活动客户端数组中移除客户端连接
-	self->_conns->removeConnection(conn);
+	_conns->removeConnection(conn);
 
 	// 添加已关闭连接到待移除链表中
-	conn->next = self->_connsToRemoveHead;
-	self->_connsToRemoveHead = conn;
+	conn->next = _connsToRemoveHead;
+	_connsToRemoveHead = conn;
 }
 
 int TcpServer::serverCron(long long id, void* clientData)
@@ -479,6 +449,7 @@ static bool isIntagerString(const char* str)
 	return true;
 }
 
+
 void TcpServer::loadConfig(const char* fileName)
 {
 	FILE* pf = fopen(fileName, "r");
@@ -489,118 +460,114 @@ void TcpServer::loadConfig(const char* fileName)
 	}
 
 	int lines = 0;
-	char buf[CONFIG_MAX_LINE + 1] = {0};
+	char buf[CONFIG_MAX_LINE + 1] = { 0 };
 	while (fgets(buf, CONFIG_MAX_LINE + 1, pf) != NULL)
 	{
 		if (buf[CONFIG_MAX_LINE] != '\0') goto err;
 
 		lines++;
-
-		if (strchr(buf, '#'))
+		char field[128] = { 0 };
+		char value[16][128] = { 0 };
+		char* p = buf;
+		while (*p == ' ' || *p == '\t') p++;		// 忽略空格 
+		if (*p == '\r' || *p == '\n' || *p == '#')	// 忽略空行,注释行
 		{
 			memset(buf, 0, CONFIG_MAX_LINE + 1);
-			continue;
+			continue;	
 		}
 
-		if (buf[0] == '\r' || buf[0] == '\n')
+		// 解析字段
+		int fieldIndex = 0;
+		while (fieldIndex < 128)
 		{
-			memset(buf, 0, CONFIG_MAX_LINE + 1);
-			continue;
+			char c = *p;
+			if (c == '\r' || c == '\n') goto err;
+			if (c == ' ' || c == '\t') break;
+			field[fieldIndex++] = c;
+			p++;
 		}
 
-		for (int i = 0; i < CONFIG_MAX_LINE + 1; ++i)
+		if (*p != ' ' && *p != '\t') goto err;
+		while (*p == ' ' || *p == '\t') p++;		// 忽略空格
+
+		// 解析值
+		int valueIndex1 = 0;
+		int valueIndex2 = 0;
+		while (valueIndex2 < 128)
 		{
-			if (buf[i] == ' ' || buf[i] == '\t')
-				buf[i] = '\0';
-			else if (buf[i] == '\r' || buf[i] == '\n')
+			if (*p == '\r' || *p == '\n') break;	// 结束
+			if (*p == ' ' || *p == '\t')
 			{
-				buf[i] = '\0';
-				if (i < CONFIG_MAX_LINE)
-					buf[i + 1] = '\n';
-				break;
+				while (*p == ' ' || *p == '\t') p++;
+				valueIndex1++;
+				valueIndex2 = 0;
 			}
+			value[valueIndex1][valueIndex2] = *p;
+			valueIndex2++;
+			p++;
 		}
 
-		int indexArray[BINDADDR_MAX] = { 0 };
-		int recordIndex = 0;
-		for (int i = 0; i < CONFIG_MAX_LINE + 1;)
+		if (strlen(value[valueIndex1]) == 0) goto err;	// 没有值
+		if (!strcmp(field, CONFIG_FILED_BIND))
 		{
-			if (buf[i] == '\n')
+			for(int i = 0; i < valueIndex1 + 1; ++i)
 			{
-				break;
-			}
-			else if (buf[i] != '\0')
-			{
-				indexArray[recordIndex++] = i;
-				i += strlen(buf + i);
-			}
-			else
-			{
-				i++;
-			}
-		}
-		if (recordIndex >= 2)
-		{
-			const char* filed = buf + indexArray[0];
-			if (!strcmp(filed, CONFIG_FILED_BIND))
-			{
-				for (int j = 1; j < recordIndex; ++j)
+				int len = strlen(value[i]);
+				if (len > 0)
 				{
-					const char* value = buf + indexArray[j];
-					const int valueLen = strlen(value);
-
-					char* newValue = new char[valueLen + 1];
-					newValue[valueLen] = '\0';
-					strcpy(newValue, value);
+					char* newValue = new char[len + 1];
+					newValue[len] = '\0';
+					strncpy(newValue, value[i], len);
 
 					_bindAddr[_bindaAddrCount] = newValue;
 					_bindaAddrCount += 1;
 				}
 			}
-			else if (!strcmp(filed, CONFIG_FILED_PORT))
-			{
-				if (recordIndex > 2) goto err;
-
-				const char* value = buf + indexArray[1];
-				if (!isIntagerString(value)) goto err;
-				
-				_port = atoi(value);
-			}
-			else if (!strcmp(filed, CONFIG_FILED_BACKLOG))
-			{
-				if (recordIndex > 2) goto err;
-
-				const char* value = buf + indexArray[1];
-				if (!isIntagerString(value)) goto err;
-
-				_backLog = atoi(value);
-			}
-			else if (!strcmp(filed, CONFIG_FILED_HZ))
-			{
-				if (recordIndex > 2) goto err;
-
-				const char* value = buf + indexArray[1];
-				if (!isIntagerString(value)) goto err;
-
-				_hz = atoi(value);
-			}
-			else if (!strcmp(filed, CONFIG_FILED_TIMEOUT))
-			{
-				if (recordIndex > 2) goto err;
-
-				const char* value = buf + indexArray[1];
-				if (!isIntagerString(value)) goto err;
-
-				_timeout = atoi(value);
-			}
-			else
-			{
-				goto err;
-			}
 		}
-		
-	
-		memset(buf, CONFIG_MAX_LINE + 1, 0);
+		else if (!strcmp(field, CONFIG_FILED_PORT))
+		{
+			int len = strlen(value[0]);
+			if (len == 0)goto err;
+
+			const char* v = value[0];
+			if (!isIntagerString(v)) goto err;
+			_port = atoi(v);
+
+		}
+		else if (!strcmp(field, CONFIG_FILED_BACKLOG))
+		{
+			int len = strlen(value[0]);
+			if (len == 0)goto err;
+
+			const char* v = value[0];
+			if (!isIntagerString(v)) goto err;
+			_backLog = atoi(v);
+			
+		}
+		else if (!strcmp(field, CONFIG_FILED_HZ))
+		{
+			int len = strlen(value[0]);
+			if (len == 0)goto err;
+
+			const char* v = value[0];
+			if (!isIntagerString(v)) goto err;
+			_hz = atoi(v);
+		}
+		else if (!strcmp(field, CONFIG_FILED_TIMEOUT))
+		{
+			int len = strlen(value[0]);
+			if (len == 0)goto err;
+
+			const char* v = value[0];
+			if (!isIntagerString(v)) goto err;
+			_timeout = atoi(v);
+		}
+		else
+		{
+			goto err;
+		}
+
+		memset(buf, 0, CONFIG_MAX_LINE + 1);
 	}
 	fclose(pf);
 	return;
@@ -610,6 +577,7 @@ err:
 	Log::info("server.cfg error in line%d", lines);
 	exit(0);
 }
+
 
 bool TcpServer::listen()
 {

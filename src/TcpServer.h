@@ -1,6 +1,7 @@
 #ifndef __LIB_NETWORK_TCP_SERVER_H__
 #define __LIB_NETWORK_TCP_SERVER_H__
 #include "Types.h"
+#include <functional>
 namespace libnetwork
 {
 	class EventLoop;
@@ -74,12 +75,6 @@ namespace libnetwork
 		// 接收客户端连接回调
 		static void acceptHandler(int listenFD, void* clientData);
 
-		// 接收数据完成
-		static void recvCompleteHandler(Connection* conn, void* target);
-
-		// 断开连接
-		static void disconnectHandler(Connection* conn, void* target);
-
 		// 时间事件回调，每秒调用hz次
 		static int serverCron(long long id, void* clientData);
 
@@ -113,6 +108,16 @@ namespace libnetwork
 
 		// 检查客户端连接是否存活
 		void checkClientConnectionAlive();
+
+		// 接收数据之后解析包数据
+		int parsePacket(ConnID connID, const char* buf, int size, std::function<void(ConnID, const Packet&)> onPacketCall);
+
+		// 接收数据完成
+		void recvCompleteHandler(Connection* conn);
+
+		// 断开连接
+		void disconnectHandler(Connection* conn);
+
 	public:
 		// 构造函数
 		TcpServer();
