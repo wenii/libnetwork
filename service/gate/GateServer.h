@@ -4,6 +4,7 @@
 #include <string>
 #include <list>
 #include <vector>
+#include "ServiceDiscoveryListenner.h"
 using namespace libnetwork;
 class ZookeeperClient;
 
@@ -18,25 +19,34 @@ public:
 	virtual void onPacketFromServer(ConnID connID, const Packet& packet);
 
 	// 接收到新的客户端连接
-	virtual void onAccept(long long clientID);
+	virtual void onAccept(ConnID connID);
 
 	// 客户端断开连接
-	virtual void onDisconnect(long long clientID);
+	virtual void onDisconnect(ConnID connID);
 
 	// 更新
 	virtual void update(int dt);
 
 public:
-	// 服务列表通知
-	static void serviceListNotify(const std::string& path, const std::list<std::string>& datas, void* target);
+	// 路由服务监听器
+	class RouterServiceDiscoveryListenner : public ServiceDiscoveryListenner
+	{
+	public:
+		RouterServiceDiscoveryListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target);
+	public:
+		virtual void notify(const std::list<std::string>& serviceInfoArray, void* target);
+	};
 
 private:
 	// 获取路由服务连接
 	ConnID findRouterServiceID(ConnID clientID);
 
+	// 移除路由服务连接
+	void removeRouterConnID(ConnID connID);
+
 private:
 	ZookeeperClient* _zkClient;
-	std::vector<std::pair<ConnID, std::string>> _routerList;
+	std::vector<std::pair<ConnID, std::string>> _routerVec;
 };
 
 

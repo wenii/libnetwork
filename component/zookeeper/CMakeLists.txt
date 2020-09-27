@@ -1,6 +1,8 @@
 set(SRC_LIST 
 "ZookeeperHandle.cpp"
 "ZookeeperWatcher.cpp"
+"ZookeeperClient.cpp"
+"ServiceDiscoveryListenner.cpp"
 )
 
 set(LIB_NAME "zk")

@@ -1,7 +1,6 @@
 
 set(SRC_LIST 
 "GateServer.cpp"
-"ZookeeperClient.cpp"
 "main.cpp"
 )
 
