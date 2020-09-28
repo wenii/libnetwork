@@ -4,6 +4,7 @@
 #include <string>
 #include <list>
 #include <vector>
+#include <unordered_map>
 #include "ServiceDiscoveryListenner.h"
 using namespace libnetwork;
 class ZookeeperClient;
@@ -47,6 +48,8 @@ private:
 private:
 	ZookeeperClient* _zkClient;
 	std::vector<std::pair<ConnID, std::string>> _routerVec;
+	std::unordered_map<std::string, std::string> _configMap;
+	
 };
 
 

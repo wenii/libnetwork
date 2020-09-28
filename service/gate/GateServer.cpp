@@ -2,13 +2,17 @@
 #include "../../src/Packet.h"
 #include "../../proto/GateProtoPacket.h"
 #include <arpa/inet.h>
+#include <string.h>
 #include "ZookeeperClient.h"
 using namespace libnetwork;
-const char* CURRENT_SERVICE_NAME = "gate_server";
-const char* CURRENT_SERVICE_PARENT_PATH = "/gate";
-const char* SERVICE_ROUTER_NAME = "/router";
-const char* ZOOKEEPER_HOST = "zk.xxx.com:2181";
-const char* CURRENT_SERVER_ADDR_INFO = "xxx.xxx.com:8888";
+
+static const char* CONFIG_FILE_NAME = "gate.cfg";
+static const char* CONFIG_FIELD_ADDR_INFO = "addrInfo";
+static const char* CONFIG_FIELD_ZOOKEEPER_HOST = "zookeeperHost";
+static const char* CONFIG_FIELD_SERVICE_NAME = "serviceName";
+static const char* CONFIG_FIELD_SERVICE_PARENT_PATH = "serviceParentPath";
+static const char* CONFIG_FIELD_ROUTER_PATH = "routerPath";
+
 
 GateServer::RouterServiceDiscoveryListenner::RouterServiceDiscoveryListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target)
 	: ServiceDiscoveryListenner(zkClient, servicePath, target)
@@ -41,10 +45,28 @@ void GateServer::RouterServiceDiscoveryListenner::notify(const std::list<std::st
 
 bool GateServer::onInit()
 {
-	_zkClient = new ZookeeperClient(ZOOKEEPER_HOST, 5);
-	_zkClient->setRegisterServiceName(CURRENT_SERVICE_NAME, CURRENT_SERVICE_PARENT_PATH);
-	_zkClient->setRegisterServiceAddrInfo(CURRENT_SERVER_ADDR_INFO);
-	_zkClient->addServiceDiscoveryListenner(new RouterServiceDiscoveryListenner(_zkClient, SERVICE_ROUTER_NAME, this));
+	// ¶ÁÈ¡ÅäÖÃ
+	loadConfig(CONFIG_FILE_NAME, [this](const char* field, const char* value) -> bool {
+		if (!strcmp(field, CONFIG_FIELD_ADDR_INFO))
+			_configMap[CONFIG_FIELD_ADDR_INFO] = value;
+		else if (!strcmp(field, CONFIG_FIELD_ROUTER_PATH))
+			_configMap[CONFIG_FIELD_ROUTER_PATH] = value;
+		else if (!strcmp(field, CONFIG_FIELD_SERVICE_NAME))
+			_configMap[CONFIG_FIELD_SERVICE_NAME] = value;
+		else if (!strcmp(field, CONFIG_FIELD_SERVICE_PARENT_PATH))
+			_configMap[CONFIG_FIELD_SERVICE_PARENT_PATH] = value;
+		else if (!strcmp(field, CONFIG_FIELD_ZOOKEEPER_HOST))
+			_configMap[CONFIG_FIELD_ZOOKEEPER_HOST] = value;
+		else
+			return false;
+		return true;
+		});
+	
+	// ³õÊ¼»¯zookeeper
+	_zkClient = new ZookeeperClient(_configMap[CONFIG_FIELD_ZOOKEEPER_HOST], 10);
+	_zkClient->setRegisterServiceName(_configMap[CONFIG_FIELD_SERVICE_NAME], _configMap[CONFIG_FIELD_SERVICE_PARENT_PATH]);
+	_zkClient->setRegisterServiceAddrInfo(_configMap[CONFIG_FIELD_ADDR_INFO]);
+	_zkClient->addServiceDiscoveryListenner(new RouterServiceDiscoveryListenner(_zkClient, _configMap[CONFIG_FIELD_ROUTER_PATH], this));
 	return _zkClient->connectToZookeeper();
 }
 
