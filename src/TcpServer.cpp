@@ -74,11 +74,6 @@ TcpServer::TcpServer()
 
 	_eventLoop = EventLoop::create(CLIENT_LIST_COUNT);
 
-	//for (int i = 0; i < BINDADDR_MAX; ++i)
-	//{
-	//	_bindAddr[i] = nullptr;
-	//	_ipFD[i] = -1;
-	//}
 	memset(_bindAddr, 0, BINDADDR_MAX);
 	memset(_ipFD, -1, BINDADDR_MAX);
 
@@ -518,6 +513,7 @@ void TcpServer::loadConfig(const char* fileName, std::function<bool(const char*,
 			int len = strlen(value[i]);
 			if (len > 0)
 			{
+				Log::info("%s %s = %s", fileName, field, value[i]);
 				if (!call(field, value[i])) goto err;
 			}
 		}

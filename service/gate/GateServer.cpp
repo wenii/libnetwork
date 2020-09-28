@@ -12,6 +12,7 @@ static const char* CONFIG_FIELD_ZOOKEEPER_HOST = "zookeeperHost";
 static const char* CONFIG_FIELD_SERVICE_NAME = "serviceName";
 static const char* CONFIG_FIELD_SERVICE_PARENT_PATH = "serviceParentPath";
 static const char* CONFIG_FIELD_ROUTER_PATH = "routerPath";
+static const char* CONFIG_FIELD_ZOOKEEPER_TIMEOUT = "zkTimeout";
 
 
 GateServer::RouterServiceDiscoveryListenner::RouterServiceDiscoveryListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target)
@@ -57,13 +58,16 @@ bool GateServer::onInit()
 			_configMap[CONFIG_FIELD_SERVICE_PARENT_PATH] = value;
 		else if (!strcmp(field, CONFIG_FIELD_ZOOKEEPER_HOST))
 			_configMap[CONFIG_FIELD_ZOOKEEPER_HOST] = value;
+		else if (!strcmp(field, CONFIG_FIELD_ZOOKEEPER_TIMEOUT))
+			_configMap[CONFIG_FIELD_ZOOKEEPER_TIMEOUT] = value;
 		else
 			return false;
 		return true;
 		});
 	
 	// ³õÊ¼»¯zookeeper
-	_zkClient = new ZookeeperClient(_configMap[CONFIG_FIELD_ZOOKEEPER_HOST], 10);
+	const int zkTimeout = atoi(_configMap[CONFIG_FIELD_ZOOKEEPER_TIMEOUT].c_str());
+	_zkClient = new ZookeeperClient(_configMap[CONFIG_FIELD_ZOOKEEPER_HOST], zkTimeout);
 	_zkClient->setRegisterServiceName(_configMap[CONFIG_FIELD_SERVICE_NAME], _configMap[CONFIG_FIELD_SERVICE_PARENT_PATH]);
 	_zkClient->setRegisterServiceAddrInfo(_configMap[CONFIG_FIELD_ADDR_INFO]);
 	_zkClient->addServiceDiscoveryListenner(new RouterServiceDiscoveryListenner(_zkClient, _configMap[CONFIG_FIELD_ROUTER_PATH], this));
@@ -119,7 +123,7 @@ void GateServer::onDisconnect(ConnID connID)
 
 void GateServer::update(int dt)
 {
-
+	_zkClient->handleNotify();
 }
 
 ConnID GateServer::findRouterServiceID(ConnID clientID)

@@ -43,7 +43,7 @@ void ZookeeperClient::removeServiceDiscoveryListenner(const std::string& path)
 void ZookeeperClient::setRegisterServiceName(const std::string& serviceName, const std::string& parentPath)
 {
 	_serviceName = serviceName;
-	_parentPath = _parentPath;
+	_parentPath = parentPath;
 }
 
 void ZookeeperClient::setRegisterServiceAddrInfo(const std::string& serviceAddrInfo)
@@ -59,21 +59,11 @@ void ZookeeperClient::onConnected()
 	{
 		if (registerService())
 		{
-			printf("success regiseter service when node be deleted!\n");
-
-			// 设置服务地址信息
-			if (zkHandle->setData(_servicePath, _serviceAddrInfo))
-			{
-				printf("success set service addr info.\n");
-			}
-			else
-			{
-				printf("failed set service addr info.\n");
-			}
+			printf("success regiseter service when connect to zookeeper host!\n");
 		}
 		else
 		{
-			printf("failed register service when node be deleted!\n");
+			printf("failed register service when connect to zookeeper host!\n");
 		}
 	}
 
@@ -122,16 +112,28 @@ bool ZookeeperClient::registerService()
 	std::string path = _parentPath;
 	path.append("/").append(_serviceName);
 	_servicePath.clear();
+	// 创建节点
 	if (zkHandle->createEphemeralZNode(path, "", _servicePath))
 	{
 		printf("create node success. path:%s\n", _servicePath.c_str());
-		if (zkHandle->setWatchWhenZnodeDelete(_servicePath))
+		// 设置服务地址信息
+		if (zkHandle->setData(_servicePath, _serviceAddrInfo))
 		{
-			return true;
+			printf("success set service addr info.\n");
+			// 设置删除事件，防止外部意外删除节点
+			if (zkHandle->setWatchWhenZnodeDelete(_servicePath))
+			{
+				printf("set path:%s delete event success.\n", _servicePath.c_str());
+				return true;
+			}
+			else
+			{
+				printf("set path:%s delete event failed.\n", _servicePath.c_str());
+			}
 		}
 		else
 		{
-			printf("set path:%s watch failed.\n", _servicePath.c_str());
+			printf("failed set service addr info.\n");
 		}
 	}
 	else

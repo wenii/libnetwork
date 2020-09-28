@@ -144,8 +144,5 @@ void ZookeeperWatcher::watcherCallback(zhandle_t* zh, int type, int state, const
 	ZookeeperWatcher* zkWatcher = (ZookeeperWatcher*)watcherCtx;
 	std::queue<WatchedEvent*>& eventQueue = zkWatcher->getEventQueue();
 	ZookeeperWatcher::WatchedEvent* watchedEvent = new ZookeeperWatcher::WatchedEvent(type, state, path);
-	if (watchedEvent != nullptr)
-	{
-		eventQueue.push(watchedEvent);
-	}
+	eventQueue.push(watchedEvent);
 }
