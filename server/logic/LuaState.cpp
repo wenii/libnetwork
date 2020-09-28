@@ -37,7 +37,7 @@ void LuaState::update(int dt)
 	lua_pcall(_l, 1, 0, 0);
 }
 
-void LuaState::onRouter(uint32_t gateID, uint32_t clientID, const char* data, int size)
+void LuaState::onMessage(uint32_t gateID, uint32_t clientID, const char* data, int size)
 {
 	lua_getglobal(_l, "onRouter");
 	lua_pushinteger(_l, gateID);

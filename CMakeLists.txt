@@ -16,9 +16,8 @@ add_subdirectory("src")
 add_subdirectory("test")
 add_subdirectory("examples/echo")
 add_subdirectory("proto")
-add_subdirectory("service/gate")
-add_subdirectory("service/router")
-add_subdirectory("service/logic")
+add_subdirectory("server/gate")
+add_subdirectory("server/logic")
 add_subdirectory("component/zookeeper")
 
 

@@ -9,21 +9,21 @@ using namespace libnetwork;
 static const char* CONFIG_FILE_NAME = "gate.cfg";
 static const char* CONFIG_FIELD_ADDR_INFO = "addrInfo";
 static const char* CONFIG_FIELD_ZOOKEEPER_HOST = "zookeeperHost";
-static const char* CONFIG_FIELD_SERVICE_NAME = "serviceName";
-static const char* CONFIG_FIELD_SERVICE_PARENT_PATH = "serviceParentPath";
-static const char* CONFIG_FIELD_ROUTER_PATH = "routerPath";
+static const char* CONFIG_FIELD_SERVER_NAME = "serverName";
+static const char* CONFIG_FIELD_SERVER_PARENT_PATH = "serverParentPath";
+static const char* CONFIG_FIELD_LOGIC_SERVER_PATH = "logicServerPath";
 static const char* CONFIG_FIELD_ZOOKEEPER_TIMEOUT = "zkTimeout";
 
 
-GateServer::RouterServiceDiscoveryListenner::RouterServiceDiscoveryListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target)
+GateServer::LogicServerListenner::LogicServerListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target)
 	: ServiceDiscoveryListenner(zkClient, servicePath, target)
 {
 
 }
 
-void GateServer::RouterServiceDiscoveryListenner::notify(const std::list<std::string>& serviceInfoArray, void* target)
+void GateServer::LogicServerListenner::notify(const std::list<std::string>& serviceInfoArray, void* target)
 {
-	// 连接路由服务
+	// 连接逻辑服
 	GateServer* self = (GateServer*)target;
 	for (auto itr = serviceInfoArray.begin(); itr != serviceInfoArray.end(); ++itr)
 	{
@@ -32,13 +32,13 @@ void GateServer::RouterServiceDiscoveryListenner::notify(const std::list<std::st
 		if (connID != INVALID_CONN)
 		{
 			// 连接成功
-			printf("success connectio to router server:%s\n", hostAddr.c_str());
-			self->_routerVec.push_back(std::pair<ConnID, std::string>(connID, hostAddr));
+			printf("success connectio to logic server:%s\n", hostAddr.c_str());
+			self->_logicServerIDVec.push_back(std::pair<ConnID, std::string>(connID, hostAddr));
 		}
 		else
 		{
 			// 连接失败
-			printf("failed connect to router server:%s\n", hostAddr.c_str());
+			printf("failed connect to logic server:%s\n", hostAddr.c_str());
 		}
 	}
 }
@@ -50,12 +50,12 @@ bool GateServer::onInit()
 	loadConfig(CONFIG_FILE_NAME, [this](const char* field, const char* value) -> bool {
 		if (!strcmp(field, CONFIG_FIELD_ADDR_INFO))
 			_configMap[CONFIG_FIELD_ADDR_INFO] = value;
-		else if (!strcmp(field, CONFIG_FIELD_ROUTER_PATH))
-			_configMap[CONFIG_FIELD_ROUTER_PATH] = value;
-		else if (!strcmp(field, CONFIG_FIELD_SERVICE_NAME))
-			_configMap[CONFIG_FIELD_SERVICE_NAME] = value;
-		else if (!strcmp(field, CONFIG_FIELD_SERVICE_PARENT_PATH))
-			_configMap[CONFIG_FIELD_SERVICE_PARENT_PATH] = value;
+		else if (!strcmp(field, CONFIG_FIELD_LOGIC_SERVER_PATH))
+			_configMap[CONFIG_FIELD_LOGIC_SERVER_PATH] = value;
+		else if (!strcmp(field, CONFIG_FIELD_SERVER_NAME))
+			_configMap[CONFIG_FIELD_SERVER_NAME] = value;
+		else if (!strcmp(field, CONFIG_FIELD_SERVER_PARENT_PATH))
+			_configMap[CONFIG_FIELD_SERVER_PARENT_PATH] = value;
 		else if (!strcmp(field, CONFIG_FIELD_ZOOKEEPER_HOST))
 			_configMap[CONFIG_FIELD_ZOOKEEPER_HOST] = value;
 		else if (!strcmp(field, CONFIG_FIELD_ZOOKEEPER_TIMEOUT))
@@ -68,9 +68,9 @@ bool GateServer::onInit()
 	// 初始化zookeeper
 	const int zkTimeout = atoi(_configMap[CONFIG_FIELD_ZOOKEEPER_TIMEOUT].c_str());
 	_zkClient = new ZookeeperClient(_configMap[CONFIG_FIELD_ZOOKEEPER_HOST], zkTimeout);
-	_zkClient->setRegisterServiceName(_configMap[CONFIG_FIELD_SERVICE_NAME], _configMap[CONFIG_FIELD_SERVICE_PARENT_PATH]);
+	_zkClient->setRegisterServiceName(_configMap[CONFIG_FIELD_SERVER_NAME], _configMap[CONFIG_FIELD_SERVER_PARENT_PATH]);
 	_zkClient->setRegisterServiceAddrInfo(_configMap[CONFIG_FIELD_ADDR_INFO]);
-	_zkClient->addServiceDiscoveryListenner(new RouterServiceDiscoveryListenner(_zkClient, _configMap[CONFIG_FIELD_ROUTER_PATH], this));
+	_zkClient->addServiceDiscoveryListenner(new LogicServerListenner(_zkClient, _configMap[CONFIG_FIELD_LOGIC_SERVER_PATH], this));
 	return _zkClient->connectToZookeeper();
 }
 
@@ -80,10 +80,10 @@ void GateServer::onPacket(ConnID connID, const Packet& packet)
 	GateProtoPacket gateProtoPacket;
 	gateProtoPacket.packing(connID, packet.getBody(), packet.getBodySize());
 		
-	// 转发包到路由服
+	// 转发包到逻辑服
 	uint16_t packetSize = gateProtoPacket.getSize();
 	packetSize = htons(packetSize);
-	ConnID routerID = findRouterServiceID(connID);
+	ConnID routerID = findLogicServerID(connID);
 	if (routerID != INVALID_CONN)
 	{
 		send(routerID, (char*)&packetSize, sizeof(GateProtoPacket::PACKET_SIZE_BYTES));
@@ -98,7 +98,7 @@ void GateServer::onPacket(ConnID connID, const Packet& packet)
 
 void GateServer::onPacketFromServer(ConnID connID, const Packet& packet)
 {
-	// 从路由服务来的消息
+	// 从逻辑服来的消息
 	GateProtoPacket gateProtoPacket;
 	gateProtoPacket.unPacking(packet.getSize(), packet.getBody(), packet.getBodySize());
 
@@ -117,37 +117,39 @@ void GateServer::onAccept(ConnID connID)
 
 void GateServer::onDisconnect(ConnID connID)
 {
-	// 移除路由服务连接
-	removeRouterConnID(connID);
+	// 移除逻辑服连接
+	removeLogicServerConnID(connID);
 }
 
 void GateServer::update(int dt)
 {
 	_zkClient->handleNotify();
+
+
 }
 
-ConnID GateServer::findRouterServiceID(ConnID clientID)
+ConnID GateServer::findLogicServerID(ConnID clientID)
 {
-	const int size = _routerVec.size();
+	const int size = _logicServerIDVec.size();
 	if (size != 0)
 	{
 		const int index = clientID % size;
-		return _routerVec[index].first;
+		return _logicServerIDVec[index].first;
 	}
 	else
 	{
-		printf("no router service find.\n");
+		printf("no logic server find.\n");
 		return INVALID_CONN;
 	}
 }
 
-void GateServer::removeRouterConnID(ConnID connID)
+void GateServer::removeLogicServerConnID(ConnID connID)
 {
-	for (auto itr = _routerVec.begin(); itr != _routerVec.end(); ++itr)
+	for (auto itr = _logicServerIDVec.begin(); itr != _logicServerIDVec.end(); ++itr)
 	{
 		if (itr->first == connID)
 		{
-			_routerVec.erase(itr);
+			_logicServerIDVec.erase(itr);
 			break;
 		}
 	}

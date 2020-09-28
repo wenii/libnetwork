@@ -22,7 +22,7 @@ link_directories("${CMAKE_BINARY_DIR}../../zookeeper")
 
 MESSAGE("CMAKE_SOURCE_DIR:${CMAKE_SOURCE_DIR}/thirdparty/zookeeper/lib")
 
-INSTALL(FILES "${CMAKE_SOURCE_DIR}/thirdparty/zookeeper/lib/libzookeeper_mt.so.2" DESTINATION ${CMAKE_BINARY_DIR}/service/gate)
-INSTALL(FILES "../../server.cfg" DESTINATION ${CMAKE_BINARY_DIR}/service/gate)
-INSTALL(FILES "gate.cfg" DESTINATION ${CMAKE_BINARY_DIR}/service/gate)
+INSTALL(FILES "${CMAKE_SOURCE_DIR}/thirdparty/zookeeper/lib/libzookeeper_mt.so.2" DESTINATION ${CMAKE_BINARY_DIR}/server/gate)
+INSTALL(FILES "../../server.cfg" DESTINATION ${CMAKE_BINARY_DIR}/server/gate)
+INSTALL(FILES "gate.cfg" DESTINATION ${CMAKE_BINARY_DIR}/server/gate)
 INSTALL(TARGETS ${OUT_FILE} RUNTIME DESTINATION /home/dev/projects)

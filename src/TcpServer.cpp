@@ -435,19 +435,6 @@ void TcpServer::signalHandler(int sig, void* clientData)
 	}
 }
 
-// 判断一个字符串是否可以转换整形
-static bool isIntagerString(const char* str)
-{
-	const int len = strlen(str);
-	for (int i = 0; i < len; ++i)
-	{
-		if (!(str[i] >= '0' && str[i] <= '9'))
-			return false;
-	}
-	return true;
-}
-
-
 void TcpServer::loadConfig(const char* fileName, std::function<bool(const char*, const char*)> call)
 {
 	FILE* pf = fopen(fileName, "r");

@@ -13,7 +13,7 @@ public:
 	void onAccept(uint32_t connID);
 	void onDisconnect(uint32_t connID);
 	void update(int dt);
-	void onRouter(uint32_t gateID, uint32_t clientID, const char* data, int size);
+	void onMessage(uint32_t gateID, uint32_t clientID, const char* data, int size);
 public:
 	lua_State* _l;
 };

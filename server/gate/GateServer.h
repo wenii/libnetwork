@@ -30,24 +30,24 @@ public:
 
 public:
 	// 路由服务监听器
-	class RouterServiceDiscoveryListenner : public ServiceDiscoveryListenner
+	class LogicServerListenner : public ServiceDiscoveryListenner
 	{
 	public:
-		RouterServiceDiscoveryListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target);
+		LogicServerListenner(ZookeeperClient* zkClient, const std::string& servicePath, void* target);
 	public:
 		virtual void notify(const std::list<std::string>& serviceInfoArray, void* target);
 	};
 
 private:
-	// 获取路由服务连接
-	ConnID findRouterServiceID(ConnID clientID);
+	// 获取逻辑服连接
+	ConnID findLogicServerID(ConnID clientID);
 
-	// 移除路由服务连接
-	void removeRouterConnID(ConnID connID);
+	// 移除逻辑服连接
+	void removeLogicServerConnID(ConnID connID);
 
 private:
 	ZookeeperClient* _zkClient;
-	std::vector<std::pair<ConnID, std::string>> _routerVec;
+	std::vector<std::pair<ConnID, std::string>> _logicServerIDVec;
 	std::unordered_map<std::string, std::string> _configMap;
 	
 };

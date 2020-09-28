@@ -1,13 +1,13 @@
-#ifndef __ROUTER_SERVER_H__
-#define __ROUTER_SERVER_H__
+#ifndef __LOGIC_SERVER_H__
+#define __LOGIC_SERVER_H__
 #include "../../src/TcpServer.h"
 using namespace libnetwork;
 class LuaState;
-class RouterServer : public TcpServer
+class LogicServer : public TcpServer
 {
 public:
-	RouterServer();
-	virtual ~RouterServer();
+	LogicServer();
+	virtual ~LogicServer();
 public:
 	// 数据包
 	virtual void onPacket(ConnID connID, const Packet& packet);
@@ -22,18 +22,16 @@ public:
 	virtual void update(int dt);
 
 public:
-	// 发送数据到逻辑服
-	void sendToLogicServer(ConnID logicID, ConnID gateID, ConnID clientID, const char* data, int dataSize);
 
 	// 发送数据到网关服
 	void sendToGateServer(ConnID gateID, ConnID clientID, const char* data, int dataSize);
 
-private:
-	// 路由消息
-	void router(ConnID gateID, ConnID clientID, const char* data, int dataSize);
+	// 处理消息
+	void handleMessage(ConnID gateID, ConnID clientID, const char* data, int dataSize);
+
 
 private:
 	LuaState* _luaState;
 };
 
-#endif // !__ROUTER_SERVER_H__
+#endif // !__LOGIC_SERVER_H__
